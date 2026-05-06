@@ -145,7 +145,7 @@ function HeroSection({
   };
 
   const itemVariants = {
-    hidden:  { opacity: 0, y: 24 },
+    hidden: { opacity: 0, y: 24 },
     visible: {
       opacity: 1,
       y: 0,
@@ -259,9 +259,6 @@ function HeroSection({
           </motion.div>
         </div>
       </div>
-
-      {/* Wave bottom border */}
-      <HeroBottomWave />
     </section>
   );
 }
@@ -307,7 +304,7 @@ function HowItWorksSection() {
   };
 
   const itemVariants = {
-    hidden:  { opacity: 0, y: 32 },
+    hidden: { opacity: 0, y: 32 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } },
   };
 
@@ -430,7 +427,7 @@ function FrameworkPreviewSection() {
   };
 
   const cardVariants = {
-    hidden:  { opacity: 0, y: 40, rotate: 0 },
+    hidden: { opacity: 0, y: 40, rotate: 0 },
     visible: (i: number) => ({
       opacity: 1,
       y: 0,

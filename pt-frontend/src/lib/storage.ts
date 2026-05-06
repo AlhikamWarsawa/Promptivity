@@ -1,22 +1,76 @@
-// PT Storage utilities — placeholder
-// TODO: Implement localStorage helpers in Day 5
+/* ============================================
+   PT Storage — localStorage abstraction
+   Versi awal (Day 3). Akan dikembangkan Day 7.
+   ============================================ */
 
-export function saveSession(key: string, data: unknown): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(key, JSON.stringify(data));
-  }
-}
+import type { PTSession, Personalization } from '@/types/pt.types';
 
-export function loadSession<T>(key: string): T | null {
-  if (typeof window !== 'undefined') {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
-  }
-  return null;
-}
+const KEYS = {
+  SESSION:      'pt_session',
+  PERSONA:      'pt_persona',
+  SKIP_LOGIN:   'pt_skip_login',
+} as const;
 
-export function clearSession(key: string): void {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(key);
-  }
-}
+export const PTStorage = {
+  // Session
+  saveSession: (session: PTSession): void => {
+    try {
+      localStorage.setItem(KEYS.SESSION, JSON.stringify(session));
+    } catch (e) {
+      console.warn('PT: Failed to save session to localStorage', e);
+    }
+  },
+
+  getSession: (): PTSession | null => {
+    try {
+      const raw = localStorage.getItem(KEYS.SESSION);
+      return raw ? (JSON.parse(raw) as PTSession) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  // Personalization
+  savePersona: (persona: Personalization): void => {
+    try {
+      localStorage.setItem(KEYS.PERSONA, JSON.stringify(persona));
+    } catch (e) {
+      console.warn('PT: Failed to save persona', e);
+    }
+  },
+
+  getPersona: (): Personalization | null => {
+    try {
+      const raw = localStorage.getItem(KEYS.PERSONA);
+      return raw ? (JSON.parse(raw) as Personalization) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  // Skip login flag
+  setSkipLogin: (): void => {
+    try {
+      localStorage.setItem(KEYS.SKIP_LOGIN, 'true');
+    } catch {
+      /* noop */
+    }
+  },
+
+  isSkipLogin: (): boolean => {
+    try {
+      return localStorage.getItem(KEYS.SKIP_LOGIN) === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  // Clear everything
+  clearAll: (): void => {
+    try {
+      Object.values(KEYS).forEach((key) => localStorage.removeItem(key));
+    } catch {
+      /* noop */
+    }
+  },
+};

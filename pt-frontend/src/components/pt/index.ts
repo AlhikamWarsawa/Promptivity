@@ -38,3 +38,15 @@ export { PTTextarea } from './PTTextarea';
 export type { PTTextareaProps } from './PTTextarea';
 
 export { OnboardingTopBar } from './OnboardingTopBar';
+
+export { WordCounter }                        from './WordCounter';
+export type { }                               from './WordCounter'; // no extra types
+
+export { ProcessingOverlay, PT_PROCESSING_MESSAGES } from './ProcessingOverlay';
+export type { ProcessingMessage }             from './ProcessingOverlay';
+
+export { HintCard, BRAIN_DUMP_HINTS }         from './HintCard';
+export type { HintItem }                      from './HintCard';
+
+export { PTInput } from './PTInput';
+export type { PTInputProps } from './PTInput';

@@ -9,6 +9,9 @@ import {
   BodyText, SmallText, LabelText,
 } from '@/components/pt/Typography';
 import { FRAMEWORK_LIST } from '@/lib/frameworkConfig';
+import { WordCounter }        from '@/components/pt/WordCounter';
+import { HintCard }           from '@/components/pt/HintCard';
+import { PTInput }            from '@/components/pt/PTInput';
 
 /* ============================================
    /dev — PT Component Preview (Storybook-lite)
@@ -273,6 +276,47 @@ export default function DevPage() {
               </div>
             </PTCard>
           ))}
+        </div>
+      </Section>
+
+      {/* Section WordCounter */}
+      <HandDrawnDivider variant="wave" label="🔢 WORD COUNTER" />
+      <Section title="WordCounter">
+        <div className="max-w-lg space-y-8">
+          <div>
+            <LabelText className="mb-2 block">0 kata (belum mulai)</LabelText>
+            <WordCounter wordCount={0} minWords={50} />
+          </div>
+          <div>
+            <LabelText className="mb-2 block">15 kata (dalam perjalanan)</LabelText>
+            <WordCounter wordCount={15} minWords={50} />
+          </div>
+          <div>
+            <LabelText className="mb-2 block">35 kata (hampir sampai)</LabelText>
+            <WordCounter wordCount={35} minWords={50} />
+          </div>
+          <div>
+            <LabelText className="mb-2 block">50+ kata (ready!)</LabelText>
+            <WordCounter wordCount={67} minWords={50} />
+          </div>
+        </div>
+      </Section>
+
+      {/* Section HintCard */}
+      <HandDrawnDivider variant="zigzag" label="💡 HINT CARD" />
+      <Section title="HintCard">
+        <div className="max-w-sm">
+          <HintCard />
+        </div>
+      </Section>
+
+      {/* Section PTInput */}
+      <HandDrawnDivider variant="dots" label="✏️ PT INPUT" />
+      <Section title="PTInput">
+        <div className="max-w-md space-y-4">
+          <PTInput label="Nama" icon="👤" placeholder="Ketik nama kamu..." required />
+          <PTInput label="Email" icon="📧" placeholder="email@example.com" type="email" hint="Tidak akan di-spam." />
+          <PTInput label="Dengan error" error="Field ini wajib diisi." />
         </div>
       </Section>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { motion, useInView } from 'framer-motion';
 import { useRef, useState, useEffect } from 'react';
 import { PTButton } from '@/components/pt/PTButton';
@@ -782,45 +783,18 @@ function PageFooter() {
  */
 function PTLogo({ size = 32 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 40 40"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="PT Logo"
+    <div
+      style={{ width: size, height: size }}
+      className="relative shrink-0 rounded-sketch border-2 border-pt-black shadow-sketch-sm overflow-hidden bg-pt-yellow"
     >
-      {/* Background square — cream */}
-      <rect
-        x="2" y="2" width="36" height="36"
-        rx="6"
-        fill="#F5D60D"
-        stroke="#2B2B2B"
-        strokeWidth="2.5"
+      <Image
+        src="/promptivity.png"
+        alt="Promptivity Logo"
+        fill
+        className="object-cover"
+        sizes={`${size}px`}
       />
-      {/* Shadow offset square */}
-      <rect
-        x="4" y="4" width="36" height="36"
-        rx="6"
-        fill="none"
-        stroke="#2B2B2B"
-        strokeWidth="1"
-        opacity="0.2"
-      />
-      {/* "PT" text */}
-      <text
-        x="50%"
-        y="54%"
-        dominantBaseline="middle"
-        textAnchor="middle"
-        fontFamily="'Gaegu', cursive"
-        fontWeight="700"
-        fontSize="18"
-        fill="#2B2B2B"
-      >
-        PT
-      </text>
-    </svg>
+    </div>
   );
 }
 

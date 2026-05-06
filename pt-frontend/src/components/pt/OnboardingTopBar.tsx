@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { ProgressSteps, PT_ONBOARDING_STEPS } from './ProgressSteps';
 
 /* ============================================
@@ -32,12 +33,13 @@ export function OnboardingTopBar({ currentStep }: OnboardingTopBarProps) {
           className="shrink-0 flex items-center gap-2 font-display font-bold text-xl hover:opacity-80 transition-opacity"
           style={{ fontFamily: 'var(--font-display)', color: 'var(--pt-black)' }}
         >
-          <span
-            className="w-8 h-8 rounded-sketch border-2 border-pt-black flex items-center justify-center text-sm font-bold"
-            style={{ backgroundColor: 'var(--pt-yellow)', fontFamily: 'var(--font-display)' }}
-          >
-            PT
-          </span>
+          <Image
+            src="/promptivity.png"
+            alt="Promptivity Logo"
+            width={32}
+            height={32}
+            className="w-8 h-8 rounded-sketch border-2 border-pt-black shadow-sketch-sm object-cover"
+          />
           <span className="hidden sm:inline">Promptivity</span>
         </Link>
 

@@ -1,4 +1,10 @@
-# Promptivity
+<h1 align="center">Promptivity</h1>
+
+<p align="center">
+
+<p align="center">
+  <img src="promptivity.png" alt="Logo" width="180">
+</p>
 
 > Tell your story. We build your mission.
 

@@ -50,3 +50,4 @@ export type { HintItem }                      from './HintCard';
 
 export { PTInput } from './PTInput';
 export type { PTInputProps } from './PTInput';
+export { StoreInitializer } from './StoreInitializer';

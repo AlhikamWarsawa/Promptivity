@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PTButton }          from '@/components/pt/PTButton';
 import { OnboardingTopBar }  from '@/components/pt/OnboardingTopBar';
-import { WordCounter }        from '@/components/pt/WordCounter';
+import { WordCounter }       from '@/components/pt/WordCounter';
 import { ProcessingOverlay, PT_PROCESSING_MESSAGES } from '@/components/pt/ProcessingOverlay';
-import { HintCard }           from '@/components/pt/HintCard';
-import { PTCard }             from '@/components/pt/PTCard';
-import PTStorage              from '@/lib/storage';
+import { HintCard }          from '@/components/pt/HintCard';
+import { PTCard }            from '@/components/pt/PTCard';
+import PTStorage             from '@/lib/storage';
+import { usePTStore }        from '@/store/usePTStore';
+import type { Personalization } from '@/types/pt.types';
 
 /* ============================================
    /onboarding/brain-dump — Brain Dump Page
@@ -21,120 +23,158 @@ import PTStorage              from '@/lib/storage';
    4. WordCounter menunjukkan progress ke 50 kata
    5. Tombol aktif saat >= 50 kata
    6. Klik "Build My Mission" → ProcessingOverlay tampil
-   7. Simulasi loading 12 detik → redirect /dashboard
-   
-   Note: Day 5 = UI only. Koneksi AI di Day 6.
+   7. Memanggil API via Zustand store
    ============================================ */
 
 const MIN_WORDS  = 50;
-const AUTO_SAVE_DELAY_MS = 800;   // Debounce auto-save ke localStorage
 
 export default function BrainDumpPage() {
-  const router              = useRouter();
-  const textareaRef         = useRef<HTMLTextAreaElement>(null);
-  const autoSaveTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router           = useRouter();
+  const textareaRef      = useRef<HTMLTextAreaElement>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [story, setStory]           = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
-  const [persona, setPersona]       = useState<{ name: string } | null>(null);
+  // Local UI state
+  const [story, setStory]                 = useState('');
+  const [hasStarted, setHasStarted]       = useState(false);
   const [showNudgeModal, setShowNudgeModal] = useState(false);
+  const [persona, setPersona]             = useState<{ name: string } | null>(null);
+
+  // Zustand store
+  const { processStory, isLoading, error, clearError } = usePTStore();
 
   // Load draft & persona dari localStorage saat mount
   useEffect(() => {
     const draft = PTStorage.getStoryDraft();
-    if (draft) setStory(draft);
+    if (draft) {
+      setStory(draft);
+      // Trigger auto-resize untuk loaded draft
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+      }, 50);
+    }
 
     const p = PTStorage.getPersona();
     if (p) setPersona({ name: p.name });
   }, []);
 
-  // Count words
+  // Watch isLoading → redirect saat selesai
+  useEffect(() => {
+    // Redirect ke dashboard saat processing selesai + ada session
+    const session = usePTStore.getState().session;
+    if (!isLoading && session && hasStarted) {
+      PTStorage.clearStoryDraft();
+      router.push('/dashboard');
+    }
+  }, [isLoading, hasStarted, router]);
+
+  // Word count
   const wordCount = story.trim().split(/\s+/).filter(Boolean).length;
   const isReady   = wordCount >= MIN_WORDS;
 
-  // Auto-save ke localStorage (debounced)
-  const handleStoryChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setStory(val);
-    if (!hasStarted) setHasStarted(true);
+  // Auto-save story draft (debounced)
+  const handleStoryChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value;
+      setStory(val);
+      if (!hasStarted) setHasStarted(true);
 
-    // Auto-resize textarea
-    const ta = e.target;
-    ta.style.height = 'auto';
-    ta.style.height = `${ta.scrollHeight}px`;
+      // Auto-resize
+      const ta = e.target;
+      ta.style.height = 'auto';
+      ta.style.height = `${ta.scrollHeight}px`;
 
-    // Debounced save
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(() => {
-      PTStorage.saveStoryDraft(val);
-    }, AUTO_SAVE_DELAY_MS);
-  }, [hasStarted]);
+      // Debounced save
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = setTimeout(() => {
+        PTStorage.saveStoryDraft(val);
+      }, 800);
+    },
+    [hasStarted],
+  );
 
-  // Cleanup timer on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
   }, []);
 
-  // Prompt starters — klik auto-isi prefix ke textarea
+  // Prompt starters
   function applyStarter(starterText: string) {
-    const newVal = story
-      ? `${story}\n\n${starterText}`
-      : starterText;
+    const newVal = story ? `${story}\n\n${starterText}` : starterText;
     setStory(newVal);
     PTStorage.saveStoryDraft(newVal);
+    if (!hasStarted) setHasStarted(true);
 
-    // Focus textarea setelah apply
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
         textareaRef.current.style.height = 'auto';
         textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        // Cursor ke akhir
         const len = newVal.length;
         textareaRef.current.setSelectionRange(len, len);
       }
     }, 50);
   }
 
-  // Submit handler (Day 5 = simulation only)
-  function handleBuildMission() {
-    if (isProcessing) return;
+  // Submit: trigger real AI processing
+  async function handleBuildMission() {
+    if (isLoading) return;
 
     if (!isReady) {
-      // Jangan disable — tampilkan nudge
       setShowNudgeModal(true);
       return;
     }
 
+    clearError();
     PTStorage.saveStoryDraft(story);
-    setIsProcessing(true);
+
+    // Get personalization from localStorage
+    const personalization = PTStorage.getPersona() as Partial<Personalization> | null;
+
+    // Trigger Zustand action → real API call
+    setHasStarted(true);
+    await processStory(story, personalization ?? undefined);
+    // Redirect handled by useEffect watching isLoading
   }
 
-  // Called by ProcessingOverlay when messages finish
-  function handleProcessingComplete() {
-    router.push('/dashboard');
+  // Force process even with < 50 words (from NudgeModal)
+  async function handleForceProcess() {
+    setShowNudgeModal(false);
+    clearError();
+    PTStorage.saveStoryDraft(story);
+    const personalization = PTStorage.getPersona() as Partial<Personalization> | null;
+    setHasStarted(true);
+    await processStory(story, personalization ?? undefined);
   }
 
-  // Greet text
-  const firstName  = persona?.name?.split(' ')[0] ?? null;
-  const greetName  = firstName && firstName !== 'Friend' ? `, ${firstName}` : '';
+  const firstName = persona?.name?.split(' ')[0] ?? null;
+  const greetName = firstName && firstName !== 'Friend' ? `, ${firstName}` : '';
 
   return (
     <main
       className="min-h-screen flex flex-col"
       style={{ backgroundColor: 'var(--pt-cream)' }}
     >
-      {/* Top bar — step 3 */}
       <OnboardingTopBar currentStep={3} />
 
-      {/* Processing overlay */}
+      {/* Real ProcessingOverlay — driven by Zustand isLoading */}
       <ProcessingOverlay
-        isVisible={isProcessing}
+        isVisible={isLoading}
         messages={PT_PROCESSING_MESSAGES}
-        onComplete={handleProcessingComplete}
+        onComplete={() => {
+          // onComplete tidak dipakai lagi untuk redirect
+          // redirect di-handle oleh useEffect di atas
+        }}
+      />
+
+      {/* Error toast — muncul kalau ada error dari API */}
+      <ErrorToast
+        message={error}
+        onDismiss={clearError}
       />
 
       {/* Nudge modal */}
@@ -143,37 +183,25 @@ export default function BrainDumpPage() {
         wordCount={wordCount}
         minWords={MIN_WORDS}
         onClose={() => setShowNudgeModal(false)}
-        onContinueAnyway={() => {
-          setShowNudgeModal(false);
-          PTStorage.saveStoryDraft(story);
-          setIsProcessing(true);
-        }}
+        onContinueAnyway={handleForceProcess}
       />
 
       {/* Page content */}
       <div className="flex-1 px-4 sm:px-6 py-8 md:py-12">
         <div className="max-w-6xl mx-auto">
-
-          {/* Greeting */}
           <PersonaGreeting greetName={greetName} />
 
-          {/* Main layout: 2 col desktop */}
           <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
-
-            {/* ===== LEFT: Input Panel ===== */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] as const }}
               className="flex flex-col gap-5"
             >
-              {/* Main prompt */}
               <MainPromptDisplay />
-
-              {/* Prompt starters */}
               <PromptStarters onSelect={applyStarter} />
 
-              {/* Story textarea */}
+              {/* Textarea */}
               <div
                 className="rounded-sketch border-2 border-pt-black overflow-hidden"
                 style={{
@@ -181,12 +209,10 @@ export default function BrainDumpPage() {
                   boxShadow: '4px 4px 0px #2B2B2B',
                 }}
               >
-                {/* Textarea header bar */}
                 <div
                   className="flex items-center gap-2 px-4 py-2 border-b-2 border-pt-black"
                   style={{ backgroundColor: 'var(--pt-yellowP)' }}
                 >
-                  {/* Decorative "traffic lights" */}
                   {['var(--pt-coral)', 'var(--pt-mustard)', 'var(--pt-green)'].map((c, i) => (
                     <div
                       key={i}
@@ -201,14 +227,13 @@ export default function BrainDumpPage() {
                   >
                     my_story.txt
                   </span>
-                  {/* Auto-save indicator */}
                   <AnimatePresence>
                     {hasStarted && (
                       <motion.span
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="ml-auto text-[10px] font-body"
+                        className="ml-auto text-[10px]"
                         style={{ color: '#6B6B6B', fontFamily: 'var(--font-body)' }}
                       >
                         💾 auto-saved
@@ -217,34 +242,24 @@ export default function BrainDumpPage() {
                   </AnimatePresence>
                 </div>
 
-                {/* Textarea itself */}
                 <textarea
                   ref={textareaRef}
                   value={story}
                   onChange={handleStoryChange}
                   placeholder={STORY_PLACEHOLDER}
-                  className={[
-                    'w-full px-5 py-5',
-                    'text-body leading-relaxed',
-                    'bg-transparent',
-                    'resize-none overflow-hidden',
-                    'focus:outline-none',
-                    'placeholder:text-[#9B9B9B] placeholder:italic',
-                  ].join(' ')}
+                  className="w-full px-5 py-5 text-body leading-relaxed bg-transparent resize-none overflow-hidden focus:outline-none placeholder:text-[#9B9B9B] placeholder:italic"
                   style={{
-                    fontFamily:  'var(--font-body)',
-                    color:       'var(--pt-black)',
-                    minHeight:   '280px',
-                    fontSize:    '1rem',
-                    lineHeight:  '1.8',
+                    fontFamily: 'var(--font-body)',
+                    color:      'var(--pt-black)',
+                    minHeight:  '280px',
+                    fontSize:   '1rem',
+                    lineHeight: '1.8',
                   }}
                   aria-label="Ceritakan situasimu"
-                  aria-required="true"
-                  disabled={isProcessing}
+                  disabled={isLoading}
                   spellCheck={false}
                 />
 
-                {/* Word counter (inside card, below textarea) */}
                 <div
                   className="px-5 py-3 border-t border-pt-black/10"
                   style={{ backgroundColor: 'var(--pt-white)' }}
@@ -253,17 +268,15 @@ export default function BrainDumpPage() {
                 </div>
               </div>
 
-              {/* Submit button */}
               <SubmitSection
                 isReady={isReady}
-                isProcessing={isProcessing}
+                isProcessing={isLoading}
                 wordCount={wordCount}
                 minWords={MIN_WORDS}
                 onSubmit={handleBuildMission}
               />
             </motion.div>
 
-            {/* ===== RIGHT: Hint Card ===== */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -271,8 +284,6 @@ export default function BrainDumpPage() {
               className="lg:sticky lg:top-6"
             >
               <HintCard />
-
-              {/* Extra: example story teaser */}
               <ExampleStoryCard />
             </motion.div>
           </div>
@@ -337,7 +348,6 @@ function MainPromptDisplay() {
           style={{ color: 'var(--pt-brown)' }}
         >
           make your mission.
-          {/* Underline sketch */}
           <svg
             className="absolute -bottom-1 left-0 w-full"
             viewBox="0 0 200 8"
@@ -452,7 +462,6 @@ function SubmitSection({
           className="w-full sm:w-auto relative overflow-hidden"
           aria-label="Build My Mission"
         >
-          {/* Shimmer hanya saat ready */}
           {isReady && (
             <motion.div
               className="absolute inset-0 bg-white/20"
@@ -470,7 +479,6 @@ function SubmitSection({
         </PTButton>
       </motion.div>
 
-      {/* Status text */}
       <AnimatePresence mode="wait">
         {!isReady ? (
           <motion.p
@@ -542,7 +550,6 @@ function NudgeModal({
               accentColor="var(--pt-mustard)"
               accentHeight={5}
             >
-              {/* Moti mascot mini */}
               <div className="flex items-start gap-4">
                 <div
                   className="shrink-0 w-14 h-14 rounded-sketch border-2 border-pt-black flex items-center justify-center text-3xl"
@@ -571,7 +578,6 @@ function NudgeModal({
                 </div>
               </div>
 
-              {/* Suggestions */}
               <div
                 className="mt-4 p-3 rounded-sketch border border-pt-black/20 space-y-1.5"
                 style={{ backgroundColor: 'var(--pt-cream)' }}
@@ -598,7 +604,6 @@ function NudgeModal({
                 ))}
               </div>
 
-              {/* Actions */}
               <div className="mt-5 flex flex-col gap-2">
                 <PTButton
                   variant="primary"
@@ -654,7 +659,7 @@ function ExampleStoryCard() {
               className="text-label font-bold"
               style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
             >
-              Lihat contoh cerita
+               Lihat contoh cerita
             </span>
           </div>
           <motion.span
@@ -699,6 +704,63 @@ function ExampleStoryCard() {
         </AnimatePresence>
       </div>
     </motion.div>
+  );
+}
+
+/* ---- Error Toast ---- */
+
+function ErrorToast({
+  message,
+  onDismiss,
+}: {
+  message:   string | null;
+  onDismiss: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {message && (
+        <motion.div
+          initial={{ opacity: 0, y: -60 }}
+          animate={{ opacity: 1, y: 0   }}
+          exit={{ opacity: 0,   y: -60  }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div
+            className="flex items-start gap-3 p-4 rounded-sketch border-2 border-pt-black"
+            style={{
+              backgroundColor: 'var(--pt-coral)',
+              boxShadow:       '4px 4px 0px #2B2B2B',
+            }}
+          >
+            <span className="text-2xl shrink-0" aria-hidden="true">😵</span>
+            <div className="flex-1">
+              <p
+                className="font-bold text-sm text-white"
+                style={{ fontFamily: 'var(--font-body)' }}
+              >
+                Moti mengalami kendala
+              </p>
+              <p
+                className="text-sm text-white/90 mt-0.5 leading-snug"
+                style={{ fontFamily: 'var(--font-body)' }}
+              >
+                {message}
+              </p>
+            </div>
+            <button
+              onClick={onDismiss}
+              className="shrink-0 text-white/80 hover:text-white transition-colors text-lg leading-none"
+              aria-label="Tutup pesan error"
+            >
+              ×
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

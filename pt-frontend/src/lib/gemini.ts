@@ -1,40 +1,44 @@
 /* ============================================
    Promptivity — Backend API Client
-   Connects frontend to FastAPI backend.
+   Updated Day 7: integrate with parseSession
    ============================================ */
 
 import type { PTSession, Personalization } from '@/types/pt.types';
+import { parseSession, validateSession }    from '@/lib/parsers';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
-export interface ProcessStoryRequest {
-  story:           string;
+export interface ProcessStoryInput {
+  rawText:          string;
   personalization?: Partial<Personalization>;
 }
 
-export interface ProcessStoryResponse {
+export interface APIResult {
   success: boolean;
-  data?:   PTSession;
-  error?:  string;
+  session?: PTSession;
+  error?:   string;
 }
 
 /**
- * Send story to Promptivity backend for AI processing.
- * Backend calls Gemini and returns structured PTSession.
+ * Send story to Promptivity backend.
+ * Parses and validates response before returning.
+ * Never throws — always returns APIResult.
  */
-export async function processStory(
-  request: ProcessStoryRequest,
-): Promise<ProcessStoryResponse> {
+export async function processStoryAPI(
+  input: ProcessStoryInput,
+): Promise<APIResult> {
   const controller = new AbortController();
-  // 90 second timeout (Gemini can be slow for 13 frameworks)
   const timeoutId  = setTimeout(() => controller.abort(), 90_000);
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/process-story`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(request),
-      signal:  controller.signal,
+      body:    JSON.stringify({
+        story:           input.rawText,
+        personalization: input.personalization ?? null,
+      }),
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -46,14 +50,37 @@ export async function processStory(
           error:   'Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.',
         };
       }
+      const errBody = await response.json().catch(() => ({}));
       return {
         success: false,
-        error:   `Server error: ${response.status}`,
+        error:   (errBody as { detail?: string }).detail ?? `Server error: ${response.status}`,
       };
     }
 
-    const data = await response.json() as ProcessStoryResponse;
-    return data;
+    const body = await response.json();
+
+    if (!body.success) {
+      return {
+        success: false,
+        error:   body.error ?? 'Moti gagal memproses ceritamu. Coba lagi.',
+      };
+    }
+
+    // Parse raw data → typed PTSession
+    const session = parseSession(
+      body.data,
+      input.rawText,
+      input.personalization as Personalization | undefined,
+    );
+
+    // Validate (log issues but don't fail)
+    const { valid, issues } = validateSession(session);
+    if (!valid) {
+      console.warn('[Promptivity] Session validation issues:', issues);
+      // Still return session — parser already filled defaults
+    }
+
+    return { success: true, session };
 
   } catch (error) {
     clearTimeout(timeoutId);
@@ -61,7 +88,7 @@ export async function processStory(
     if (error instanceof DOMException && error.name === 'AbortError') {
       return {
         success: false,
-        error:   'Request timeout. Gemini membutuhkan waktu lebih lama. Coba lagi.',
+        error:   'Request timeout (90s). Gemini butuh waktu lebih lama dari biasanya. Coba lagi.',
       };
     }
 
@@ -72,6 +99,7 @@ export async function processStory(
       };
     }
 
+    console.error('[Promptivity] Unexpected API error:', error);
     return {
       success: false,
       error:   'Terjadi kesalahan tidak terduga. Coba lagi.',

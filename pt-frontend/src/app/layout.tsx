@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DM_Sans, Gaegu } from 'next/font/google';
+import { StoreInitializer } from '@/components/pt/StoreInitializer';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -43,6 +44,7 @@ export default function RootLayout({
           color: 'var(--pt-black)',
         }}
       >
+        <StoreInitializer />
         {children}
       </body>
     </html>

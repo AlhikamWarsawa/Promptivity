@@ -8,6 +8,7 @@ import { OnboardingTopBar }  from '@/components/pt/OnboardingTopBar';
 import { WordCounter }        from '@/components/pt/WordCounter';
 import { ProcessingOverlay, PT_PROCESSING_MESSAGES } from '@/components/pt/ProcessingOverlay';
 import { HintCard }           from '@/components/pt/HintCard';
+import { PTCard }             from '@/components/pt/PTCard';
 import PTStorage              from '@/lib/storage';
 
 /* ============================================
@@ -37,6 +38,7 @@ export default function BrainDumpPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [persona, setPersona]       = useState<{ name: string } | null>(null);
+  const [showNudgeModal, setShowNudgeModal] = useState(false);
 
   // Load draft & persona dari localStorage saat mount
   useEffect(() => {
@@ -99,8 +101,14 @@ export default function BrainDumpPage() {
 
   // Submit handler (Day 5 = simulation only)
   function handleBuildMission() {
-    if (!isReady || isProcessing) return;
-    // Save final story
+    if (isProcessing) return;
+
+    if (!isReady) {
+      // Jangan disable — tampilkan nudge
+      setShowNudgeModal(true);
+      return;
+    }
+
     PTStorage.saveStoryDraft(story);
     setIsProcessing(true);
   }
@@ -127,6 +135,19 @@ export default function BrainDumpPage() {
         isVisible={isProcessing}
         messages={PT_PROCESSING_MESSAGES}
         onComplete={handleProcessingComplete}
+      />
+
+      {/* Nudge modal */}
+      <NudgeModal
+        isOpen={showNudgeModal}
+        wordCount={wordCount}
+        minWords={MIN_WORDS}
+        onClose={() => setShowNudgeModal(false)}
+        onContinueAnyway={() => {
+          setShowNudgeModal(false);
+          PTStorage.saveStoryDraft(story);
+          setIsProcessing(true);
+        }}
       />
 
       {/* Page content */}
@@ -416,29 +437,22 @@ interface SubmitSectionProps {
 function SubmitSection({
   isReady, isProcessing, wordCount, minWords, onSubmit,
 }: SubmitSectionProps) {
-  const remaining = Math.max(minWords - wordCount, 0);
-
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-      {/* Submit button */}
       <motion.div
         className="flex-1 sm:flex-none"
-        animate={isReady ? { scale: [1, 1.02, 1] } : {}}
-        transition={{ duration: 0.4, delay: 0.1 }}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
       >
         <PTButton
-          variant="primary"
+          variant={isReady ? 'primary' : 'outline'}
           size="lg"
           onClick={onSubmit}
-          disabled={!isReady || isProcessing}
+          disabled={isProcessing}
           className="w-full sm:w-auto relative overflow-hidden"
-          aria-label={
-            isReady
-              ? 'Build My Mission'
-              : `Butuh ${remaining} kata lagi sebelum bisa diproses`
-          }
+          aria-label="Build My Mission"
         >
-          {/* Shimmer effect saat ready */}
+          {/* Shimmer hanya saat ready */}
           {isReady && (
             <motion.div
               className="absolute inset-0 bg-white/20"
@@ -446,13 +460,17 @@ function SubmitSection({
               transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 2 }}
             />
           )}
-          <span className="relative">
-            {isReady ? '✨ Build My Mission' : `🔒 Build My Mission (${remaining} kata lagi)`}
+          <span className="relative flex items-center gap-2">
+            {isReady ? (
+              <>✨ Build My Mission</>
+            ) : (
+              <>🚀 Build My Mission</>
+            )}
           </span>
         </PTButton>
       </motion.div>
 
-      {/* Helper text */}
+      {/* Status text */}
       <AnimatePresence mode="wait">
         {!isReady ? (
           <motion.p
@@ -463,7 +481,7 @@ function SubmitSection({
             className="text-sm"
             style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
           >
-            Tulis minimal {minWords} kata untuk hasil terbaik
+            💬 Cerita lebih banyak = mission lebih akurat
           </motion.p>
         ) : (
           <motion.p
@@ -479,6 +497,131 @@ function SubmitSection({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/* ---- Nudge Modal ---- */
+
+function NudgeModal({
+  isOpen,
+  wordCount,
+  minWords,
+  onClose,
+  onContinueAnyway,
+}: {
+  isOpen:            boolean;
+  wordCount:         number;
+  minWords:          number;
+  onClose:           () => void;
+  onContinueAnyway:  () => void;
+}) {
+  const remaining = minWords - wordCount;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(43,43,43,0.5)', backdropFilter: 'blur(2px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        >
+          <motion.div
+            initial={{ y: 40, scale: 0.95 }}
+            animate={{ y: 0,  scale: 1    }}
+            exit={{ y: 40,   scale: 0.95  }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-md"
+          >
+            <PTCard
+              variant="white"
+              padding="lg"
+              accentColor="var(--pt-mustard)"
+              accentHeight={5}
+            >
+              {/* Moti mascot mini */}
+              <div className="flex items-start gap-4">
+                <div
+                  className="shrink-0 w-14 h-14 rounded-sketch border-2 border-pt-black flex items-center justify-center text-3xl"
+                  style={{ backgroundColor: 'var(--pt-yellowP)' }}
+                  aria-hidden="true"
+                >
+                  🧠
+                </div>
+                <div>
+                  <h3
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 'var(--text-h4)',
+                      color: 'var(--pt-black)',
+                    }}
+                  >
+                    Moti bilang: cerita dulu sedikit lagi! 😊
+                  </h3>
+                  <p
+                    className="mt-1 text-sm leading-relaxed"
+                    style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
+                  >
+                    Ceritamu sekarang punya <strong>{wordCount} kata</strong>.
+                    Dengan {remaining} kata lagi, Moti bisa bikin mission yang jauh lebih akurat dan personal.
+                  </p>
+                </div>
+              </div>
+
+              {/* Suggestions */}
+              <div
+                className="mt-4 p-3 rounded-sketch border border-pt-black/20 space-y-1.5"
+                style={{ backgroundColor: 'var(--pt-cream)' }}
+              >
+                <p
+                  className="text-label font-bold"
+                  style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
+                >
+                  Coba tambahkan:
+                </p>
+                {[
+                  'Deadline atau tanggal penting yang ada',
+                  'Hambatan atau distraksi yang sering muncul',
+                  'Apa yang ingin dicapai minggu ini',
+                ].map((s) => (
+                  <p
+                    key={s}
+                    className="text-sm flex gap-2"
+                    style={{ fontFamily: 'var(--font-body)', color: '#4B4B4B' }}
+                  >
+                    <span style={{ color: 'var(--pt-mustard)' }}>→</span>
+                    {s}
+                  </p>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div className="mt-5 flex flex-col gap-2">
+                <PTButton
+                  variant="primary"
+                  size="md"
+                  onClick={onClose}
+                  className="w-full"
+                >
+                  ✍️ Tambah Cerita Dulu
+                </PTButton>
+                <PTButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={onContinueAnyway}
+                  className="w-full"
+                >
+                  Lanjut saja dengan {wordCount} kata →
+                </PTButton>
+              </div>
+            </PTCard>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

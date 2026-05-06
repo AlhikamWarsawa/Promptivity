@@ -107,7 +107,7 @@ export function ProcessingOverlay({
           style={{ backgroundColor: 'rgba(43, 43, 43, 0.85)', backdropFilter: 'blur(4px)' }}
           role="dialog"
           aria-modal="true"
-          aria-label="Processing your story"
+          aria-label="Moti sedang membangun mission plan kamu"
           aria-live="polite"
         >
           <motion.div
@@ -206,6 +206,7 @@ function AnimatingStar() {
       animate={{ rotate: 360 }}
       transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
       className="relative w-20 h-20"
+      aria-label="Moti sedang memproses ceritamu"
     >
       {/* Outer ring */}
       <svg

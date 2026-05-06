@@ -762,7 +762,7 @@ function PageFooter() {
           className="font-body text-sm font-semibold"
           style={{ color: 'var(--pt-black)' }}
         >
-          PT — Promptivity
+          Promptivity
         </span>
       </div>
       <p className="text-sm" style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}>
@@ -823,7 +823,7 @@ function PTMascotIllustration() {
           viewBox="0 0 320 340"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          aria-label="PT Mascot — a storyteller character"
+          aria-label="Moti, maskot Promptivity"
           className="w-full max-w-[320px]"
         >
           {/* ---- BACKGROUND CARD (notebook) ---- */}

@@ -17,12 +17,12 @@ const gaegu = Gaegu({
 });
 
 export const metadata: Metadata = {
-  title: 'PT — Tell Your Story. We Build Your Mission.',
+  title: 'Promptivity — Tell Your Story. We Build Your Mission.',
   description:
-    'PT (Promptivity) mengubah cerita hidupmu menjadi mission plan terstruktur menggunakan 13 productivity framework.',
-  keywords: ['productivity', 'AI', 'mission planning', 'GTD', 'Kanban', 'Pomodoro'],
+    'Promptivity mengubah cerita hidupmu menjadi mission plan terstruktur menggunakan 13 productivity framework berbasis AI.',
+  keywords: ['productivity', 'AI', 'mission planning', 'GTD', 'Kanban', 'Pomodoro', 'Promptivity'],
   openGraph: {
-    title: 'PT — Tell Your Story. We Build Your Mission.',
+    title: 'Promptivity — Tell Your Story. We Build Your Mission.',
     description: 'AI-powered productivity mission builder.',
     type: 'website',
   },

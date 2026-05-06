@@ -1,12 +1,11 @@
-from __future__ import annotations
-
-# TODO: Implement response schemas
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 
-
-class APIResponse(BaseModel):
+class ProcessStoryResponse(BaseModel):
     success: bool
-    data: Optional[dict] = None
-    message: str = ""
-    error: Optional[str] = None
+    data:    Optional[Any] = None
+    error:   Optional[str] = None
+
+class HealthResponse(BaseModel):
+    status:  str
+    version: str

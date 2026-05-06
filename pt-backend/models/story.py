@@ -1,10 +1,14 @@
-from __future__ import annotations
-
-# TODO: Day 6 — implement story model
 from pydantic import BaseModel
 from typing import Optional
 
+class PersonalizationData(BaseModel):
+    name:            str            = "Friend"
+    role:            str            = "lainnya"
+    bigGoal:         Optional[str]  = None
+    currentProblem:  Optional[str]  = None
+    energyPattern:   str            = "variable"    # morning | night | variable
+    preferredStyle:  str            = "flexible"    # structured | flexible
 
-class StoryInput(BaseModel):
-    story: str
-    personalization: Optional[dict] = None
+class ProcessStoryRequest(BaseModel):
+    story:           str
+    personalization: Optional[PersonalizationData] = None

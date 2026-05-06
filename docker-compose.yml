@@ -1,0 +1,52 @@
+# ============================================
+# PT (Promptivity) — Docker Compose
+# Production: docker compose up
+# ============================================
+
+version: '3.9'
+
+services:
+
+  # ---- Frontend (Next.js) ----
+  frontend:
+    build:
+      context: ./pt-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: pt-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - pt-network
+
+  # ---- Backend (FastAPI) ----
+  backend:
+    build:
+      context: ./pt-backend
+      dockerfile: Dockerfile
+    container_name: pt-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+    restart: unless-stopped
+    networks:
+      - pt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  pt-network:
+    driver: bridge

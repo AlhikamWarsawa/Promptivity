@@ -4,17 +4,27 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================
+   PT (Promptivity) — Design System
+   Palette: The Playful Mission Builder
+   Style: MS Paint × Kids Book × Modern Clean
+   
+   NOTE: Tailwind v4 — all design tokens live in 
+   @theme blocks, NOT tailwind.config.ts
+   ============================================ */
+
 @theme inline {
+  /* ---- Shadcn base tokens ---- */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-dm-sans, 'DM Sans'), sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-gaegu, 'Gaegu'), cursive;
 
-  /* PT Color Palette */
+  /* ---- PT Color Palette ---- */
   --color-pt-white: #F3F3F1;
   --color-pt-cream: #E9DCCF;
-  --color-pt-yellow-p: #F6E37A;
+  --color-pt-yellowP: #F6E37A;
   --color-pt-yellow: #F5D60D;
   --color-pt-orange: #F28C28;
   --color-pt-coral: #F04E59;
@@ -26,7 +36,43 @@
   --color-pt-brown: #B85B3C;
   --color-pt-black: #2B2B2B;
 
-  /* shadcn color tokens */
+  /* ---- Priority Colors ---- */
+  --color-priority-critical: #F04E59;
+  --color-priority-high: #F28C28;
+  --color-priority-medium: #E9B12A;
+  --color-priority-low: #9AD84B;
+
+  /* ---- Font Families ---- */
+  --font-display: var(--font-gaegu, 'Gaegu'), cursive;
+  --font-body: var(--font-dm-sans, 'DM Sans'), sans-serif;
+
+  /* ---- Font Sizes (custom scale) ---- */
+  --font-size-h1: 3rem;
+  --font-size-h2: 2.25rem;
+  --font-size-h3: 1.5rem;
+  --font-size-h4: 1.25rem;
+  --font-size-body: 1rem;
+  --font-size-sm: 0.875rem;
+  --font-size-label: 0.75rem;
+
+  /* ---- Border Radius ---- */
+  --radius-sketch: 6px;
+
+  /* ---- Box Shadows ---- */
+  --shadow-sketch: 3px 3px 0px #2B2B2B;
+  --shadow-sketch-sm: 2px 2px 0px #2B2B2B;
+  --shadow-sketch-lg: 5px 5px 0px #2B2B2B;
+  --shadow-sketch-xl: 7px 7px 0px #2B2B2B;
+  --shadow-sketch-inset: inset 2px 2px 0px rgba(0,0,0,0.15);
+
+  /* ---- Animations ---- */
+  --animate-fade-up: fade-up 0.4s ease forwards;
+  --animate-fade-in: fade-in 0.3s ease forwards;
+  --animate-bounce-in: bounce-in 0.5s ease forwards;
+  --animate-wiggle: wiggle 0.4s ease;
+  --animate-press: press 0.15s ease;
+
+  /* ---- Shadcn tokens ---- */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -65,8 +111,35 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ---- Keyframes ---- */
+@keyframes fade-up {
+  0%   { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes bounce-in {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-2deg); }
+  50%      { transform: rotate(2deg); }
+}
+@keyframes press {
+  0%, 100% { transform: translate(0, 0); box-shadow: 3px 3px 0px #2B2B2B; }
+  50%      { transform: translate(2px, 2px); box-shadow: 1px 1px 0px #2B2B2B; }
+}
+
+/* ============================================
+   CSS CUSTOM PROPERTIES
+   ============================================ */
+
 :root {
-  /* PT Color Palette CSS Variables */
+  /* ---- Color Palette ---- */
   --pt-white:     #F3F3F1;
   --pt-cream:     #E9DCCF;
   --pt-yellow-p:  #F6E37A;
@@ -81,20 +154,50 @@
   --pt-brown:     #B85B3C;
   --pt-black:     #2B2B2B;
 
-  /* Typography */
-  --font-display: 'Gaegu', cursive;
-  --font-body:    'DM Sans', sans-serif;
+  /* ---- Semantic Colors ---- */
+  --color-bg:         var(--pt-white);
+  --color-surface:    var(--pt-cream);
+  --color-text:       var(--pt-black);
+  --color-text-muted: #6B6B6B;
 
-  /* Sketch style */
-  --border-sketch: 2px solid var(--pt-black);
-  --shadow-sketch: 3px 3px 0px var(--pt-black);
-  --shadow-sketch-lg: 5px 5px 0px var(--pt-black);
+  /* ---- Priority Colors ---- */
+  --priority-critical: var(--pt-coral);
+  --priority-high:     var(--pt-orange);
+  --priority-medium:   var(--pt-mustard);
+  --priority-low:      var(--pt-lime);
 
-  /* Backgrounds */
+  /* ---- Typography ---- */
+  --font-display: var(--font-gaegu, 'Gaegu'), cursive;
+  --font-body:    var(--font-dm-sans, 'DM Sans'), sans-serif;
+
+  /* ---- Font Sizes ---- */
+  --text-h1:    3rem;
+  --text-h2:    2.25rem;
+  --text-h3:    1.5rem;
+  --text-h4:    1.25rem;
+  --text-body:  1rem;
+  --text-sm:    0.875rem;
+  --text-xs:    0.75rem;
+
+  /* ---- Sketch Style Tokens ---- */
+  --border-sketch:      2px solid var(--pt-black);
+  --border-sketch-thin: 1.5px solid var(--pt-black);
+  --shadow-sketch:      3px 3px 0px var(--pt-black);
+  --shadow-sketch-lg:   5px 5px 0px var(--pt-black);
+  --shadow-sketch-xl:   7px 7px 0px var(--pt-black);
+  --shadow-sketch-inset: inset 2px 2px 0px rgba(0,0,0,0.15);
+
+  /* ---- Spacing ---- */
+  --radius-sketch: 6px;
+
+  /* ---- Transitions ---- */
+  --transition-fast:   150ms ease;
+  --transition-base:   250ms ease;
+  --transition-slow:   400ms ease;
+
+  /* ---- Shadcn tokens ---- */
   --background: var(--pt-white);
   --foreground: var(--pt-black);
-
-  /* shadcn tokens */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -161,8 +264,16 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-* {
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+*, *::before, *::after {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 @layer base {
@@ -172,23 +283,108 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   html {
     @apply font-sans;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
+    line-height: 1.2;
+    color: var(--color-text);
+  }
+  h1 { font-size: var(--text-h1); }
+  h2 { font-size: var(--text-h2); }
+  h3 { font-size: var(--text-h3); }
+  h4 { font-size: var(--text-h4); }
+  p {
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.7;
   }
 }
 
-/* Utility: sketch border style */
-.sketch-border {
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Sketch border + shadow combo */
+.sketch {
   border: var(--border-sketch);
+  border-radius: var(--radius-sketch);
   box-shadow: var(--shadow-sketch);
 }
 
-.sketch-border-lg {
+.sketch-lg {
   border: var(--border-sketch);
+  border-radius: var(--radius-sketch);
   box-shadow: var(--shadow-sketch-lg);
+}
+
+.sketch-xl {
+  border: var(--border-sketch);
+  border-radius: var(--radius-sketch);
+  box-shadow: var(--shadow-sketch-xl);
+}
+
+/* Hover lift effect */
+.hover-lift {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.hover-lift:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-sketch-lg);
+}
+
+/* Active press effect */
+.press-effect {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.press-effect:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px var(--pt-black);
+}
+
+/* Grain overlay (MS Paint texture feel) */
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--pt-cream);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--pt-black);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pt-brown);
+}
+
+/* ============================================
+   FOCUS STYLES (accessibility)
+   ============================================ */
+
+:focus-visible {
+  outline: 2px solid var(--pt-blue);
+  outline-offset: 3px;
+  border-radius: var(--radius-sketch);
 }

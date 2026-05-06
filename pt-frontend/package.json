@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "type-check": "tsc --noEmit",
+    "docker:dev": "docker compose -f ../docker-compose.dev.yml up",
+    "docker:build": "docker compose -f ../docker-compose.yml build",
+    "docker:up": "docker compose -f ../docker-compose.yml up"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

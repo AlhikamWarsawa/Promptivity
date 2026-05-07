@@ -1,9 +1,12 @@
+'use client';
+
+import { FrameworkPageLayout } from '@/components/frameworks/FrameworkPageLayout';
+import { GTDView }             from '@/components/frameworks/gtd/GTDView';
+
 export default function GTDPage() {
   return (
-    <main className="min-h-screen bg-[#F3F3F1] flex items-center justify-center">
-      <p className="font-['Gaegu'] text-2xl text-[#2B2B2B]">
-        🚧 Getting Things Done (GTD) — Coming Soon
-      </p>
-    </main>
+    <FrameworkPageLayout frameworkId="gtd">
+      <GTDView />
+    </FrameworkPageLayout>
   );
 }

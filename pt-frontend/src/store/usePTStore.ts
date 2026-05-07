@@ -12,7 +12,7 @@
 
 import { create }     from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { PTSession, Personalization } from '@/types/pt.types';
+import type { PTSession, Personalization, Task } from '@/types/pt.types';
 import { processStoryAPI }                 from '@/lib/gemini';
 import PTStorage                           from '@/lib/storage';
 
@@ -35,6 +35,8 @@ export interface PTStoreState {
   setSession:         (session: PTSession) => void;
   clearSession:       () => void;
   clearError:         () => void;
+  toggleTask:         (taskId: string) => void;
+  moveKanbanCard:     (taskId: string, toColumn: 'backlog' | 'inProgress' | 'done') => void;
 }
 
 /* ---- Store Implementation ---- */
@@ -125,6 +127,91 @@ export const usePTStore = create<PTStoreState>()(
      * Clear error state.
      */
     clearError: () => set({ error: null }),
+
+    /**
+     * Toggle task completion
+     */
+    toggleTask: (taskId) => {
+      const { session } = get();
+      if (!session) return;
+
+      // Update task di masterTaskList
+      const updatedMasterList = session.masterTaskList.map((task) =>
+        task.id === taskId
+          ? { ...task, isCompleted: !task.isCompleted }
+          : task,
+      );
+
+      // Update task di semua framework rawData dan tasks
+      const updatedFrameworks = session.frameworks.map((fw) => ({
+        ...fw,
+        tasks: fw.tasks.map((task) =>
+          task.id === taskId
+            ? { ...task, isCompleted: !task.isCompleted }
+            : task,
+        ),
+      }));
+
+      const updatedSession = {
+        ...session,
+        masterTaskList: updatedMasterList,
+        frameworks:     updatedFrameworks,
+      };
+
+      set({ session: updatedSession });
+      // Auto-save via subscriber
+    },
+
+    /**
+     * Move a Kanban card between columns.
+     * Updates rawData for the kanban framework.
+     */
+    moveKanbanCard: (taskId, toColumn) => {
+      const { session } = get();
+      if (!session) return;
+
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'kanban') return fw;
+
+        const rawData = fw.rawData as {
+          backlog:    Task[];
+          inProgress: Task[];
+          done:       Task[];
+        };
+
+        // Remove task dari semua kolom
+        let movedTask: Task | undefined;
+        const newBacklog    = (rawData.backlog ?? []).filter((t) => {
+          if (t.id === taskId) { movedTask = t; return false; } return true;
+        });
+        const newInProgress = (rawData.inProgress ?? []).filter((t) => {
+          if (t.id === taskId) { movedTask = t; return false; } return true;
+        });
+        const newDone       = (rawData.done ?? []).filter((t) => {
+          if (t.id === taskId) { movedTask = t; return false; } return true;
+        });
+
+        if (!movedTask) return fw;
+
+        // Update isCompleted berdasarkan kolom
+        const updatedTask = {
+          ...movedTask,
+          isCompleted: toColumn === 'done',
+        };
+
+        // Tambahkan ke kolom tujuan
+        if (toColumn === 'backlog')    newBacklog.push(updatedTask);
+        if (toColumn === 'inProgress') newInProgress.push(updatedTask);
+        if (toColumn === 'done')       newDone.push(updatedTask);
+
+        return {
+          ...fw,
+          rawData: { ...rawData, backlog: newBacklog, inProgress: newInProgress, done: newDone },
+        };
+      });
+
+      set({ session: { ...session, frameworks: updatedFrameworks } });
+    },
   })),
 );
 
@@ -153,6 +240,8 @@ export const selectTodayPlan   = (s: PTStoreState) =>
   s.session?.todayPlan ?? [];
 export const selectMasterTasks = (s: PTStoreState) =>
   s.session?.masterTaskList ?? [];
+export const selectToggleTask  = (s: PTStoreState) => s.toggleTask;
+export const selectMoveKanbanCard = (s: PTStoreState) => s.moveKanbanCard;
 
 /* ---- Hook: useFramework (convenience) ---- */
 

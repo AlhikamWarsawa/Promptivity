@@ -1,9 +1,12 @@
+'use client';
+
+import { FrameworkPageLayout } from '@/components/frameworks/FrameworkPageLayout';
+import { EisenhowerView }      from '@/components/frameworks/eisenhower/EisenhowerView';
+
 export default function EisenhowerPage() {
   return (
-    <main className="min-h-screen bg-[#F3F3F1] flex items-center justify-center">
-      <p className="font-['Gaegu'] text-2xl text-[#2B2B2B]">
-        🚧 Eisenhower Matrix — Coming Soon
-      </p>
-    </main>
+    <FrameworkPageLayout frameworkId="eisenhower">
+      <EisenhowerView />
+    </FrameworkPageLayout>
   );
 }

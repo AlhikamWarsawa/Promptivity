@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Gaegu } from 'next/font/google';
+import { DM_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import { StoreInitializer } from '@/components/pt/StoreInitializer';
 import './globals.css';
 
@@ -10,11 +11,26 @@ const dmSans = DM_Sans({
   weight: ['300', '400', '500', '600', '700'],
 });
 
-const gaegu = Gaegu({
-  subsets: ['latin'],
+const gaegu = localFont({
+  src: [
+    {
+      path: '../../public/fonts/gaegu/Gaegu-300.woff2',
+      weight: '300',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/gaegu/Gaegu-400.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/gaegu/Gaegu-700.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
   variable: '--font-gaegu',
   display: 'swap',
-  weight: ['300', '400', '700'],
 });
 
 export const metadata: Metadata = {

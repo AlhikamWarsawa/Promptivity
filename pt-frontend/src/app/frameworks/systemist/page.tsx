@@ -1,9 +1,12 @@
+'use client';
+
+import { FrameworkPageLayout } from '@/components/frameworks/FrameworkPageLayout';
+import { SystemistView }       from '@/components/frameworks/systemist/SystemistView';
+
 export default function SystemistPage() {
   return (
-    <main className="min-h-screen bg-[#F3F3F1] flex items-center justify-center">
-      <p className="font-['Gaegu'] text-2xl text-[#2B2B2B]">
-        🚧 Systemist — Coming Soon
-      </p>
-    </main>
+    <FrameworkPageLayout frameworkId="systemist">
+      <SystemistView />
+    </FrameworkPageLayout>
   );
 }

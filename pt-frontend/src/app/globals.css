@@ -388,3 +388,62 @@ html {
   outline-offset: 3px;
   border-radius: var(--radius-sketch);
 }
+
+/* ============================================
+   Range Input (OKR Progress Slider)
+   Custom styling untuk cross-browser consistency
+   ============================================ */
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance:         none;
+  height:             12px;
+  border-radius:      6px;
+  cursor:             pointer;
+  transition:         all 0.15s ease;
+}
+
+/* Thumb — Chrome/Safari */
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance:         none;
+  width:              20px;
+  height:             20px;
+  border-radius:      6px;
+  border:             2px solid #2B2B2B;
+  background-color:   #F5D60D;
+  box-shadow:         2px 2px 0px #2B2B2B;
+  cursor:             grab;
+  transition:         all 0.15s ease;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  background-color: #F28C28;
+}
+
+input[type='range']::-webkit-slider-thumb:active {
+  cursor:    grabbing;
+  transform: scale(0.95);
+}
+
+/* Thumb — Firefox */
+input[type='range']::-moz-range-thumb {
+  width:           20px;
+  height:          20px;
+  border-radius:   6px;
+  border:          2px solid #2B2B2B;
+  background-color:#F5D60D;
+  box-shadow:      2px 2px 0px #2B2B2B;
+  cursor:          grab;
+}
+
+input[type='range']::-moz-range-thumb:hover {
+  background-color: #F28C28;
+}
+
+/* Focus state */
+input[type='range']:focus-visible {
+  outline:        2px solid #2196E8;
+  outline-offset: 3px;
+}

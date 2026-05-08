@@ -6,16 +6,36 @@ import { motion } from 'framer-motion';
 import { DashboardNav } from '@/components/pt/DashboardNav';
 import PTStorage from '@/lib/storage';
 import { PTLogo } from '@/components/pt/icons';
+import { usePTStore } from '@/store/usePTStore';
+import { API } from '@/lib/api';
 
 export default function JournalPage() {
   const [mounted, setMounted] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [sessionDates, setSessionDates] = useState<string[]>([]);
 
+  const [sessions, setSessions] = useState<any[]>([]);
+  const isAuthenticated = usePTStore((s) => s.isAuthenticated);
+
   useEffect(() => {
     setMounted(true);
-    setSessionDates(PTStorage.getAllSessionDates());
-  }, []);
+    const localDates = PTStorage.getAllSessionDates();
+    setSessionDates(localDates);
+    
+    async function fetchBackendSessions() {
+      if (isAuthenticated) {
+        try {
+          const backendSessions = await API.get<any[]>('/sessions');
+          setSessions(backendSessions);
+          const backendDates = backendSessions.map(s => s.session_date);
+          setSessionDates(prev => [...new Set([...prev, ...backendDates])]);
+        } catch (e) {
+          console.error('Failed to fetch backend sessions:', e);
+        }
+      }
+    }
+    fetchBackendSessions();
+  }, [isAuthenticated]);
 
   const daysInMonth = useMemo(() => {
     const year = currentMonth.getFullYear();
@@ -107,12 +127,33 @@ export default function JournalPage() {
           })}
         </div>
 
-        {sessionDates.length === 0 && (
+        {sessionDates.length === 0 ? (
           <div className="text-center py-20 rounded-sketch border-2 border-dashed border-pt-black/20 bg-pt-cream/10">
             <PTLogo size={48} className="mx-auto mb-4 opacity-20" />
             <p className="text-pt-brown font-display text-lg">No missions recorded yet.</p>
             <p className="text-sm text-pt-brown/60 mt-1">Start a new story from the dashboard to fill your journal.</p>
           </div>
+        ) : (
+          <section className="space-y-4">
+            <h2 className="text-h4 font-display mb-4">Mission History</h2>
+            <div className="space-y-3">
+              {sessionDates.sort((a, b) => b.localeCompare(a)).map(date => (
+                <Link 
+                  key={date} 
+                  href={`/journal/${date}`}
+                  className="block p-4 rounded-sketch border-2 border-pt-black bg-white hover:bg-pt-yellow hover:-translate-y-1 transition-all shadow-sketch-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-pt-brown uppercase tracking-widest">{date}</p>
+                      <p className="font-display text-lg">Daily Mission</p>
+                    </div>
+                    <div className="text-2xl">🎯</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
         )}
       </main>
     </div>

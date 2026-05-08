@@ -11,10 +11,12 @@ import { usePTStore } from '@/store/usePTStore';
  */
 export function StoreInitializer() {
   const loadFromStorage = usePTStore((s) => s.loadFromStorage);
+  const initializeAuth = usePTStore((s) => s.initializeAuth);
 
   useEffect(() => {
     loadFromStorage();
-  }, [loadFromStorage]);
+    initializeAuth();
+  }, [loadFromStorage, initializeAuth]);
 
   return null;
 }

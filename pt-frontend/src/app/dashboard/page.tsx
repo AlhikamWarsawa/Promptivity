@@ -15,6 +15,7 @@ import { PriorityBadge } from '@/components/pt/PTBadge';
 import { getFramework, FRAMEWORK_LIST } from '@/lib/frameworkConfig';
 import PTStorage from '@/lib/storage';
 import { MotiMascot, PTLogo } from '@/components/pt/icons';
+import { DemoBadge } from '@/components/pt/DemoBadge';
 import type { Task, FrameworkId } from '@/types/pt.types';
 
 /* ============================================
@@ -112,6 +113,9 @@ export default function DashboardPage() {
     >
       {/* Sticky Nav */}
       <DashboardNav userName={persona?.name} />
+      
+      {/* Demo Badge */}
+      <DemoBadge />
 
       {/* Hero section */}
       <HeroSection firstName={firstName} role={userRole} />

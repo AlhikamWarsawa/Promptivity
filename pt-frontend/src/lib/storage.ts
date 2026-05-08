@@ -18,6 +18,8 @@ export const STORAGE_KEYS = {
   CONFUSED_MESSAGES: 'pt_confused_messages', // History percakapan Confused Mode
   JOURNAL_INDEX:     'pt_journal_index',     // List of dates with sessions
   SESSION_BY_DATE:   'pt_session_',          // Prefix for session by date: pt_session_YYYY-MM-DD
+  TOKEN:             'pt_token',
+  USER:              'pt_user',
 } as const;
 
 type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
@@ -217,6 +219,29 @@ export function getAllSessionDates(): string[] {
   return load<string[]>(STORAGE_KEYS.JOURNAL_INDEX) ?? [];
 }
 
+// ---- Auth ----
+
+export function saveToken(token: string): void {
+  save(STORAGE_KEYS.TOKEN, token);
+}
+
+export function getToken(): string | null {
+  return load<string>(STORAGE_KEYS.TOKEN);
+}
+
+export function saveUser(user: any): void {
+  save(STORAGE_KEYS.USER, user);
+}
+
+export function getUser(): any | null {
+  return load<any>(STORAGE_KEYS.USER);
+}
+
+export function clearAuth(): void {
+  remove(STORAGE_KEYS.TOKEN);
+  remove(STORAGE_KEYS.USER);
+}
+
 // ---- PTStorage Namespace Object (untuk backward compat & convenience) ----
 
 export const PTStorage = {
@@ -254,6 +279,12 @@ export const PTStorage = {
   saveSessionByDate,
   getSessionsByDate,
   getAllSessionDates,
+  // Auth
+  saveToken,
+  getToken,
+  saveUser,
+  getUser,
+  clearAuth,
 } as const;
 
 export default PTStorage;

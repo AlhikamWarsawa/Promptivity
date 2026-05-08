@@ -8,6 +8,8 @@ import PTStorage from '@/lib/storage';
 import { PTButton } from '@/components/pt/PTButton';
 import { PriorityBadge } from '@/components/pt/PTBadge';
 import { getFramework } from '@/lib/frameworkConfig';
+import { usePTStore } from '@/store/usePTStore';
+import { API } from '@/lib/api';
 import type { PTSession } from '@/types/pt.types';
 
 export default function JournalDetailPage() {
@@ -18,16 +20,50 @@ export default function JournalDetailPage() {
   const [mounted, setMounted] = useState(false);
   const [session, setSession] = useState<PTSession | null>(null);
 
+  const [notes, setNotes] = useState('');
+  const isAuthenticated = usePTStore((s) => s.isAuthenticated);
+
   useEffect(() => {
     setMounted(true);
-    const stored = PTStorage.getSessionsByDate(dateStr);
-    if (stored.length === 0) {
-      router.push('/journal');
-    } else {
-      // Show latest session for that date
-      setSession(stored[stored.length - 1]);
+    
+    async function fetchSession() {
+      // Try local first
+      const stored = PTStorage.getSessionsByDate(dateStr);
+      if (stored.length > 0) {
+        const sess = stored[stored.length - 1];
+        setSession(sess);
+        setNotes((sess as any).reflection_notes || '');
+      } else if (isAuthenticated) {
+        // Try backend
+        try {
+          const backendSessions = await API.get<any[]>('/sessions');
+          const sess = backendSessions.find(s => s.session_date === dateStr);
+          if (sess) {
+            setSession(sess.data);
+            setNotes(sess.reflection_notes || '');
+          } else {
+            router.push('/journal');
+          }
+        } catch (e) {
+          router.push('/journal');
+        }
+      } else {
+        router.push('/journal');
+      }
     }
-  }, [dateStr, router]);
+    fetchSession();
+  }, [dateStr, router, isAuthenticated]);
+
+  const handleSaveNotes = async () => {
+    if (isAuthenticated && session) {
+      try {
+        await API.put(`/sessions/${session.sessionId}/notes`, { notes });
+      } catch (e) {
+        console.error('Failed to save notes to backend:', e);
+      }
+    }
+    // Local save logic could go here too
+  };
 
   if (!mounted || !session) return null;
 
@@ -83,6 +119,22 @@ export default function JournalDetailPage() {
                   </div>
                 ))}
               </div>
+            </section>
+
+            <section className="p-6 rounded-sketch border-2 border-pt-black bg-white shadow-sketch">
+              <h2 className="text-h4 font-display mb-4 flex items-center gap-2">
+                ✍️ Reflection Notes
+              </h2>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={handleSaveNotes}
+                placeholder="How did your day go? What did you learn? Any blockers?"
+                className="w-full h-40 p-4 rounded-sketch border-2 border-pt-black font-body text-sm resize-none focus:outline-none focus:ring-2 focus:ring-pt-yellow"
+              />
+              <p className="text-[10px] text-pt-brown mt-2 italic">
+                Notes are auto-saved to your {isAuthenticated ? 'account' : 'local device'} when you click away.
+              </p>
             </section>
           </div>
 

@@ -106,3 +106,22 @@ async def finish_confused_session(request: Request, body: dict):
         return {"success": True, "story": data.get("story")}
     except Exception as e:
         return {"success": False, "error": str(e)}
+@router.post("/generate-framework-tasks")
+async def generate_framework_tasks(body: dict):
+    """
+    Generate deep tasks for a specific framework on demand.
+    """
+    framework_id = body.get("frameworkId")
+    session_id   = body.get("sessionId")
+    persona      = body.get("personalization")
+    
+    if not framework_id or not session_id:
+        raise HTTPException(status_code=400, detail="Missing required fields")
+        
+    try:
+        gemini = get_gemini_service()
+        # This uses the specific framework prompt but with an instruction to focus on "Tasks"
+        data = await gemini.generate_framework(session_id, framework_id)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}

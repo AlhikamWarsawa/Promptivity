@@ -88,9 +88,6 @@ export default function InputMethodPage() {
                 variant="white" padding="lg" accentColor="var(--pt-coral)" accentHeight={5}
                 className="h-full flex flex-col gap-4 relative text-left"
               >
-                <div className="absolute -top-3 left-4 px-2 py-0.5 rounded-sketch border-2 border-pt-black text-label font-bold bg-pt-yellow text-pt-black z-10">
-                  ✨ Baru
-                </div>
                 <div
                   className="w-14 h-14 rounded-sketch border-2 border-pt-black flex items-center justify-center text-3xl shadow-sketch-sm"
                   style={{ backgroundColor: 'var(--pt-cream)' }}

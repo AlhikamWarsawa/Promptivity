@@ -4,7 +4,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from schemas.responses import HealthResponse
-from routers import ai, auth
+from routers import ai, auth, sessions
 
 # ============================================
 # Promptivity — FastAPI Backend
@@ -35,8 +35,9 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(ai.router,   prefix="/api",  tags=["AI"])
-app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+app.include_router(ai.router,       prefix="/api",      tags=["AI"])
+app.include_router(auth.router,     prefix="/auth",     tags=["Auth"])
+app.include_router(sessions.router, prefix="/sessions", tags=["Sessions"])
 
 
 @app.get("/", include_in_schema=False)

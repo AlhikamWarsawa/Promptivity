@@ -27,9 +27,11 @@ export function FrameworkPageLayout({
   const FrameworkIcon = meta?.icon;
   const session  = usePTStore((s) => s.session);
   const generate = usePTStore((s) => s.generateFramework);
+  const deepGenerate = usePTStore((s) => s.generateFrameworkTasks);
   const storeError = usePTStore((s) => s.error);
   
   const [localLoading, setLocalLoading] = useState(false);
+  const [deepLoading, setDeepLoading] = useState(false);
 
   const fwData   = session?.frameworks.find(
     (f) => f.frameworkId === frameworkId,
@@ -54,6 +56,13 @@ export function FrameworkPageLayout({
     setLocalLoading(true);
     await generate(frameworkId);
     setLocalLoading(false);
+  };
+
+  const handleDeepGenerate = async () => {
+    if (deepLoading) return;
+    setDeepLoading(true);
+    await deepGenerate(frameworkId);
+    setDeepLoading(false);
   };
 
   if (!meta) return null;
@@ -97,6 +106,20 @@ export function FrameworkPageLayout({
             {isTopPick && <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sketch border-2 border-pt-black text-label font-bold mb-2 bg-pt-yellow">⭐ Top Pick</div>}
             <h1 className="text-display leading-none" style={{ fontFamily: 'var(--font-display)', color: 'var(--pt-black)' }}>{meta.name}</h1>
             <p className="mt-1 text-sm font-semibold italic" style={{ color: meta.accentColor }}>&ldquo;{meta.tagline}&rdquo;</p>
+            
+            {isGenerated && (
+              <div className="mt-4">
+                <PTButton
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeepGenerate}
+                  isLoading={deepLoading}
+                  disabled={deepLoading}
+                >
+                  ✨ Generate {meta.shortName} Tasks
+                </PTButton>
+              </div>
+            )}
           </div>
         </div>
       </section>

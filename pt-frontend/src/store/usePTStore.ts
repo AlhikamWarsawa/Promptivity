@@ -15,6 +15,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import type { PTSession, Personalization, Task } from '@/types/pt.types';
 import { processStoryAPI }                 from '@/lib/gemini';
 import PTStorage                           from '@/lib/storage';
+import { API }                             from '@/lib/api';
 
 /* ---- Store State Type ---- */
 
@@ -24,6 +25,11 @@ export interface PTStoreState {
   isLoading:   boolean;
   error:       string | null;
   loadedFromStorage: boolean;   // Apakah session di-load dari localStorage
+  
+  // Auth
+  token:           string | null;
+  user:            { id: string, name: string, email: string } | null;
+  isAuthenticated: boolean;
 
   // Actions
   processStory: (
@@ -48,6 +54,13 @@ export interface PTStoreState {
   addGreetingMessage: () => void;
   resetConfusedMessages:  () => void;
   clearConfusedSession: () => void;
+
+  // Auth Actions
+  login:            (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register:         (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logout:           () => void;
+  initializeAuth:   () => Promise<void>;
+  generateFrameworkTasks: (frameworkId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 /* ---- Store Implementation ---- */
@@ -61,6 +74,11 @@ export const usePTStore = create<PTStoreState>()(
     error:            null,
     loadedFromStorage:false,
     confusedMessages: [],
+
+    // Auth
+    token:           null,
+    user:            null,
+    isAuthenticated: false,
 
     // ---- Actions ----
 
@@ -100,9 +118,20 @@ export const usePTStore = create<PTStoreState>()(
         // Auto-save (triggered by subscriber below, but also explicit here)
         PTStorage.saveSession(result.session);
         
-        // Save to Journal
+        // Save to Journal (Local)
         const localDate = new Date().toLocaleDateString('en-CA');
         PTStorage.saveSessionByDate(localDate, result.session);
+
+        // Save to Backend (if auth)
+        const { isAuthenticated } = get();
+        if (isAuthenticated) {
+          API.post('/sessions', {
+            id: result.session.sessionId,
+            session_date: localDate,
+            raw_story: result.session.story.rawText,
+            data: result.session
+          }).catch(err => console.error('Failed to sync session to backend:', err));
+        }
 
         return { success: true };
 
@@ -357,7 +386,88 @@ export const usePTStore = create<PTStoreState>()(
     },
     clearConfusedSession: () => {
       set({ confusedMessages: [] });
+      PTStorage.clearConfusedMessages();
     },
+
+    // ---- Auth Actions ----
+
+    initializeAuth: async () => {
+      const token = PTStorage.getToken();
+      const user = PTStorage.getUser();
+      if (token && user) {
+        set({ token, user, isAuthenticated: true });
+        // Optionally verify token with /auth/me
+        try {
+          const freshUser = await API.get<any>('/auth/me');
+          set({ user: freshUser, isAuthenticated: true });
+          PTStorage.saveUser(freshUser);
+        } catch (e) {
+          get().logout();
+        }
+      }
+    },
+
+    login: async (email, password) => {
+      try {
+        const res = await API.post<any>('/auth/login', { email, password });
+        set({
+          token: res.token,
+          user: res.user,
+          isAuthenticated: true
+        });
+        PTStorage.saveToken(res.token);
+        PTStorage.saveUser(res.user);
+        return { success: true };
+      } catch (e: any) {
+        return { success: false, error: e.message };
+      }
+    },
+
+    register: async (name, email, password) => {
+      try {
+        await API.post<any>('/auth/register', { name, email, password });
+        // Auto login or redirect? Requirement says "auto login OR redirect"
+        // Let's do a quick login after register for better UX
+        return get().login(email, password);
+      } catch (e: any) {
+        return { success: false, error: e.message };
+      }
+    },
+
+    logout: () => {
+      set({ token: null, user: null, isAuthenticated: false });
+      PTStorage.clearAuth();
+    },
+
+    generateFrameworkTasks: async (frameworkId) => {
+      const { session } = get();
+      if (!session) return { success: false, error: 'No active session' };
+
+      set({ isLoading: true });
+      try {
+        const res = await API.post<any>('/api/generate-framework-tasks', {
+          frameworkId,
+          sessionId: session.sessionId,
+          personalization: PTStorage.getPersonaOrDefault()
+        });
+        
+        if (res.success && res.data) {
+          // Update the session in store with new framework data
+          const updatedFrameworks = session.frameworks.map(fw => 
+            fw.frameworkId === frameworkId ? { ...fw, rawData: res.data.data } : fw
+          );
+          
+          const updatedSession = { ...session, frameworks: updatedFrameworks };
+          set({ session: updatedSession, isLoading: false });
+          PTStorage.saveSession(updatedSession);
+          return { success: true };
+        }
+        throw new Error(res.error || 'Failed to generate tasks');
+      } catch (e: any) {
+        set({ isLoading: false, error: e.message });
+        return { success: false, error: e.message };
+      }
+    }
   })),
 );
 

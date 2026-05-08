@@ -38,6 +38,7 @@ export interface PTStoreState {
   toggleTask:         (taskId: string) => void;
   moveKanbanCard:     (taskId: string, toColumn: 'backlog' | 'inProgress' | 'done') => void;
   updateKRProgress:   (krIndex: number, progress: number) => void;
+  updateGoalProgress: (goalIndex: number, progress: number) => void;
 }
 
 /* ---- Store Implementation ---- */
@@ -241,6 +242,33 @@ export const usePTStore = create<PTStoreState>()(
       set({ session: { ...session, frameworks: updatedFrameworks } });
       // Auto-save via subscriber
     },
+
+    updateGoalProgress: (goalIndex, progress) => {
+      const { session } = get();
+      if (!session) return;
+
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'smart-goals') return fw;
+
+        const rawData = fw.rawData as {
+          goals: Array<{
+            title: string; specific: string; measurable: string;
+            achievable: string; relevant: string; timeBound: string;
+            progress: number;
+          }>;
+        };
+
+        const updatedGoals = (rawData.goals ?? []).map((goal, i) =>
+          i === goalIndex
+            ? { ...goal, progress: Math.max(0, Math.min(100, progress)) }
+            : goal,
+        );
+
+        return { ...fw, rawData: { ...rawData, goals: updatedGoals } };
+      });
+
+      set({ session: { ...session, frameworks: updatedFrameworks } });
+    },
   })),
 );
 
@@ -272,6 +300,7 @@ export const selectMasterTasks = (s: PTStoreState) =>
 export const selectToggleTask  = (s: PTStoreState) => s.toggleTask;
 export const selectMoveKanbanCard = (s: PTStoreState) => s.moveKanbanCard;
 export const selectUpdateKRProgress = (s: PTStoreState) => s.updateKRProgress;
+export const selectUpdateGoalProgress = (s: PTStoreState) => s.updateGoalProgress;
 
 /* ---- Hook: useFramework (convenience) ---- */
 

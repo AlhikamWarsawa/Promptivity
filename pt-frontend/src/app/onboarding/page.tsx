@@ -24,8 +24,12 @@ export default function OnboardingDecisionPage() {
   }
 
   function handleSkipPersonalization() {
-    // Simpan default persona agar brain-dump bisa akses data
-    PTStorage.savePersona(PTStorage.DEFAULT_PERSONA);
+    // Simpan default persona hanya jika belum ada data sebelumnya
+    // agar data lama user tetap tersimpan (sesuai request: "inget data")
+    const existing = PTStorage.getPersona();
+    if (!existing) {
+      PTStorage.savePersona(PTStorage.DEFAULT_PERSONA);
+    }
     PTStorage.setSkipLogin();
     router.push('/onboarding/brain-dump');
   }

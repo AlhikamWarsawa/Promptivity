@@ -25,10 +25,16 @@ import { PTStorage } from '@/lib/storage';
 export default function WelcomePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    const session = PTStorage.getSession();
+    if (session) {
+      setHasSession(true);
+      router.push('/dashboard');
+    }
+  }, [router]);
 
   if (!mounted) {
     // Return skeleton yang sama persis dengan Navbar
@@ -43,25 +49,29 @@ export default function WelcomePage() {
     );
   }
 
+  const handleStart = () => {
+    if (hasSession) {
+      router.push('/dashboard');
+    } else {
+      PTStorage.setSkipLogin();
+      router.push('/onboarding');
+    }
+  };
+
   return (
     <main
       className="min-h-screen overflow-x-hidden"
       style={{ backgroundColor: 'var(--pt-white)' }}
     >
-      <Navbar onLogin={() => router.push('/auth/login')} />
+      <Navbar onLogin={() => router.push('/auth/login')} hasSession={hasSession} onDashboard={() => router.push('/dashboard')} />
       <HeroSection
         onLogin={() => router.push('/auth/login')}
-        onSkip={() => {
-          PTStorage.setSkipLogin();
-          router.push('/onboarding');
-        }}
+        onSkip={handleStart}
+        hasSession={hasSession}
       />
       <HowItWorksSection />
       <FrameworkPreviewSection />
-      <FooterCTA onStart={() => {
-        PTStorage.setSkipLogin();
-        router.push('/onboarding');
-      }} />
+      <FooterCTA onStart={handleStart} hasSession={hasSession} />
       <PageFooter />
     </main>
   );
@@ -73,8 +83,12 @@ export default function WelcomePage() {
 
 function Navbar({
   onLogin,
+  hasSession,
+  onDashboard,
 }: {
   onLogin: () => void;
+  hasSession?: boolean;
+  onDashboard?: () => void;
 }) {
   return (
     <motion.nav
@@ -103,21 +117,34 @@ function Navbar({
 
       {/* Nav right */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={onLogin}
-          className="font-body text-sm font-semibold underline decoration-2 decoration-pt-black underline-offset-2 hover:text-pt-coral transition-colors"
-          style={{ color: 'var(--pt-black)' }}
-        >
-          Login
-        </button>
-        <PTButton
-          variant="outline"
-          size="sm"
-          onClick={onLogin}
-          className="hidden sm:flex"
-        >
-          Sign Up
-        </PTButton>
+        {hasSession ? (
+          <PTButton
+            variant="outline"
+            size="sm"
+            onClick={onDashboard}
+            className="flex"
+          >
+            Dashboard
+          </PTButton>
+        ) : (
+          <>
+            <button
+              onClick={onLogin}
+              className="font-body text-sm font-semibold underline decoration-2 decoration-pt-black underline-offset-2 hover:text-pt-coral transition-colors"
+              style={{ color: 'var(--pt-black)' }}
+            >
+              Login
+            </button>
+            <PTButton
+              variant="outline"
+              size="sm"
+              onClick={onLogin}
+              className="hidden sm:flex"
+            >
+              Sign Up
+            </PTButton>
+          </>
+        )}
       </div>
     </motion.nav>
   );
@@ -130,9 +157,11 @@ function Navbar({
 function HeroSection({
   onLogin,
   onSkip,
+  hasSession,
 }: {
   onLogin: () => void;
   onSkip: () => void;
+  hasSession?: boolean;
 }) {
   // Staggered animation variants
   const containerVariants = {
@@ -228,25 +257,29 @@ function HeroSection({
                 onClick={onSkip}
                 className="group"
               >
-                <span>🚀 Start Without Account</span>
+                <span>🚀 {hasSession ? 'Dashboard' : 'Start Without Account'}</span>
               </PTButton>
-              <PTButton
-                variant="ghost"
-                size="lg"
-                onClick={onLogin}
-              >
-                Login →
-              </PTButton>
+              {!hasSession && (
+                <PTButton
+                  variant="ghost"
+                  size="lg"
+                  onClick={onLogin}
+                >
+                  Login →
+                </PTButton>
+              )}
             </motion.div>
 
             {/* Micro-copy under buttons */}
-            <motion.p
-              variants={itemVariants}
-              className="text-sm"
-              style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)', opacity: 0.65 }}
-            >
-              Skip login → data tersimpan di browser kamu. Gratis. Tidak perlu kartu kredit.
-            </motion.p>
+            {!hasSession && (
+              <motion.p
+                variants={itemVariants}
+                className="text-sm"
+                style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)', opacity: 0.65 }}
+              >
+                Skip login → data tersimpan di browser kamu. Gratis. Tidak perlu kartu kredit.
+              </motion.p>
+            )}
           </motion.div>
 
           {/* Right: Mascot / Illustration */}
@@ -693,7 +726,7 @@ function FrameworkMockContent({
    SECTION 5: Footer CTA
    ============================================ */
 
-function FooterCTA({ onStart }: { onStart: () => void }) {
+function FooterCTA({ onStart, hasSession }: { onStart: () => void; hasSession?: boolean }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-60px' });
 
@@ -723,7 +756,7 @@ function FooterCTA({ onStart }: { onStart: () => void }) {
           className="text-white/80 mb-10 text-body"
           style={{ fontFamily: 'var(--font-body)' }}
         >
-          Gratis. Tidak perlu akun. Mulai sekarang dalam 30 detik.
+          {hasSession ? "Lanjutkan produktivitasmu." : "Gratis. Tidak perlu akun. Mulai sekarang dalam 30 detik."}
         </p>
         <motion.div
           whileHover={{ scale: 1.03 }}
@@ -735,7 +768,7 @@ function FooterCTA({ onStart }: { onStart: () => void }) {
             onClick={onStart}
             className="text-xl px-10 py-5"
           >
-            🚀 Mulai Sekarang — Gratis
+            {hasSession ? "🚀 Dashboard" : "🚀 Mulai Sekarang — Gratis"}
           </PTButton>
         </motion.div>
       </motion.div>

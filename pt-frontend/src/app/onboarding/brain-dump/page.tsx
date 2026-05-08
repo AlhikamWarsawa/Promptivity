@@ -300,27 +300,36 @@ export default function BrainDumpPage() {
 /* ---- Persona Greeting ---- */
 
 function PersonaGreeting({ greetName }: { greetName: string }) {
+  const router = useRouter();
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="flex items-center gap-3"
+      className="flex items-center justify-between w-full"
     >
-      <div
-        className="w-10 h-10 rounded-sketch border-2 border-pt-black flex items-center justify-center text-xl"
-        style={{ backgroundColor: 'var(--pt-yellow)' }}
-        aria-hidden="true"
-      >
-        👋
+      <div className="flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-sketch border-2 border-pt-black flex items-center justify-center text-xl"
+          style={{ backgroundColor: 'var(--pt-yellow)' }}
+          aria-hidden="true"
+        >
+          👋
+        </div>
+        <p
+          className="text-body"
+          style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
+        >
+          Hei{greetName}! Ini waktunya cerita.
+        </p>
       </div>
-      <p
-        className="text-body"
-        style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
+      <button
+        onClick={() => router.push('/onboarding/personalization')}
+        className="text-xs font-bold underline decoration-2 decoration-pt-blue underline-offset-2 hover:text-pt-blue transition-colors"
+        style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
       >
-        Hei{greetName}! Ini waktunya cerita.
-        Tulis sebebas mungkin — tidak perlu rapi.
-      </p>
+        ✏️ Ubah Profil
+      </button>
     </motion.div>
   );
 }

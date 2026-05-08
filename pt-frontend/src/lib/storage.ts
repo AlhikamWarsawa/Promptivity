@@ -10,10 +10,11 @@ import type { PTSession, Personalization } from '@/types/pt.types';
 
 // ---- Storage Keys ----
 export const STORAGE_KEYS = {
-  SESSION:    'pt_session',
-  PERSONA:    'pt_persona',
-  SKIP_LOGIN: 'pt_skip_login',
-  STORY_DRAFT:'pt_story_draft',   // Draft cerita yang belum disubmit
+  SESSION:           'pt_session',
+  PERSONA:           'pt_persona',
+  SKIP_LOGIN:        'pt_skip_login',
+  STORY_DRAFT:       'pt_story_draft',    // Draft cerita yang belum disubmit
+  WEEKLY_REFLECTION: 'pt_weekly_reflection', // Personal reflection notes (Weekly Review)
 } as const;
 
 type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
@@ -155,6 +156,16 @@ export function clearStoryDraft(): void {
   remove(STORAGE_KEYS.STORY_DRAFT);
 }
 
+// ---- Weekly Reflection (Local-only personal notes) ----
+
+export function saveWeeklyReflection(notes: string): void {
+  save(STORAGE_KEYS.WEEKLY_REFLECTION, notes);
+}
+
+export function getWeeklyReflection(): string {
+  return load<string>(STORAGE_KEYS.WEEKLY_REFLECTION) ?? '';
+}
+
 // ---- PTStorage Namespace Object (untuk backward compat & convenience) ----
 
 export const PTStorage = {
@@ -178,6 +189,9 @@ export const PTStorage = {
   saveStoryDraft,
   getStoryDraft,
   clearStoryDraft,
+  // Weekly reflection
+  saveWeeklyReflection,
+  getWeeklyReflection,
   // Keys & defaults
   KEYS: STORAGE_KEYS,
   DEFAULT_PERSONA,

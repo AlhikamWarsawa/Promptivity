@@ -51,3 +51,15 @@ export type { HintItem }                      from './HintCard';
 export { PTInput } from './PTInput';
 export type { PTInputProps } from './PTInput';
 export { StoreInitializer } from './StoreInitializer';
+
+export { ScoreBar }                       from './ScoreBar';
+export type { }                           from './ScoreBar';
+
+export { TaskCard }                       from './TaskCard';
+export type { }                           from './TaskCard';
+
+export { FrameworkCard }                  from './FrameworkCard';
+
+export { TodayPlanPanel }                 from './TodayPlanPanel';
+
+export { DashboardNav }                   from './DashboardNav';

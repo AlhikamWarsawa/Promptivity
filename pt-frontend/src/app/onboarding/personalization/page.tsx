@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { PTButton } from '@/components/pt/PTButton';
@@ -53,6 +53,21 @@ export default function PersonalizationPage() {
   const [form, setForm]       = useState<FormState>(INITIAL_STATE);
   const [errors, setErrors]   = useState<Partial<Record<keyof FormState, string>>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  // Load existing data on mount
+  useEffect(() => {
+    const existing = PTStorage.getPersona();
+    if (existing) {
+      setForm({
+        name:           existing.name ?? '',
+        role:           existing.role ?? 'mahasiswa',
+        bigGoal:        existing.bigGoal ?? '',
+        currentProblem: existing.currentProblem ?? '',
+        energyPattern:  existing.energyPattern ?? 'variable',
+        preferredStyle: existing.preferredStyle ?? 'flexible',
+      });
+    }
+  }, []);
 
   // Generic field update
   const updateField = useCallback(

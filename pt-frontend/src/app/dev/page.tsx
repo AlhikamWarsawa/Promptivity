@@ -12,6 +12,30 @@ import { FRAMEWORK_LIST } from '@/lib/frameworkConfig';
 import { WordCounter }        from '@/components/pt/WordCounter';
 import { HintCard }           from '@/components/pt/HintCard';
 import { PTInput }            from '@/components/pt/PTInput';
+import { TaskCard }           from '@/components/pt/TaskCard';
+import { FrameworkCard }      from '@/components/pt/FrameworkCard';
+import { ScoreBar }           from '@/components/pt/ScoreBar';
+import { TodayPlanPanel }     from '@/components/pt/TodayPlanPanel';
+import type { Task, FrameworkOutput, FrameworkRawData } from '@/types/pt.types';
+
+// ---- Mock data untuk preview ----
+const MOCK_TASK: Task = {
+  id: 'dev_001', title: 'Selesaikan bab 3 skripsi', priority: 'critical',
+  estimatedMinutes: 120, deadline: '2025-08-15', category: 'learning',
+  isCompleted: false, framework: 'gtd', description: 'Fokus pada metodologi penelitian',
+};
+
+const MOCK_TASK_DONE: Task = {
+  ...MOCK_TASK, id: 'dev_002', title: 'Review literatur', priority: 'high',
+  isCompleted: true, estimatedMinutes: 60,
+};
+
+const MOCK_FW: FrameworkOutput = {
+  frameworkId: 'eat-the-frog', isRecommended: true, recommendationScore: 87,
+  recommendationReason: 'Kamu punya satu tugas besar yang ditunda-tunda. Eat the Frog dirancang tepat untuk ini.',
+  tasks: [], todayActions: ['Kerjakan outline bab 3 dalam 90 menit pertama pagi ini'],
+  rawData: {} as FrameworkRawData,
+};
 
 /* ============================================
    /dev — PT Component Preview (Storybook-lite)
@@ -317,6 +341,54 @@ export default function DevPage() {
           <PTInput label="Nama" icon="👤" placeholder="Ketik nama kamu..." required />
           <PTInput label="Email" icon="📧" placeholder="email@example.com" type="email" hint="Tidak akan di-spam." />
           <PTInput label="Dengan error" error="Field ini wajib diisi." />
+        </div>
+      </Section>
+
+      <HandDrawnDivider variant="wave" label="📊 SCORE BAR" />
+      <Section title="ScoreBar">
+        <div className="max-w-md space-y-6">
+          <div><LabelText className="mb-2 block">Bar variant</LabelText>
+            <ScoreBar score={87} variant="bar" size="md" /></div>
+          <div><LabelText className="mb-2 block">Stars variant</LabelText>
+            <ScoreBar score={72} variant="stars" size="md" /></div>
+          <div><LabelText className="mb-2 block">Compact variant</LabelText>
+            <ScoreBar score={45} variant="compact" /></div>
+          <div><LabelText className="mb-2 block">Score rendah (merah)</LabelText>
+            <ScoreBar score={22} variant="bar" size="sm" /></div>
+        </div>
+      </Section>
+
+      <HandDrawnDivider variant="zigzag" label="✅ TASK CARD" />
+      <Section title="TaskCard">
+        <div className="max-w-lg space-y-3">
+          <TaskCard task={MOCK_TASK} onToggle={(id) => console.log('toggle', id)} />
+          <TaskCard task={MOCK_TASK_DONE} onToggle={(id) => console.log('toggle', id)} />
+          <TaskCard task={{ ...MOCK_TASK, id: 'dev_003', priority: 'medium', title: 'Revisi bab 2 sesuai feedback dosen', estimatedMinutes: 45, deadline: undefined }} onToggle={() => {}} compact />
+        </div>
+      </Section>
+
+      <HandDrawnDivider variant="dots" label="🗂️ FRAMEWORK CARD (GRID)" />
+      <Section title="FrameworkCard — Grid variant">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 max-w-2xl">
+          {FRAMEWORK_LIST.slice(0, 6).map((fw) => (
+            <FrameworkCard
+              key={fw.id}
+              framework={{ frameworkId: fw.id, isRecommended: fw.id === 'eat-the-frog', recommendationScore: Math.floor(Math.random() * 40) + 50, recommendationReason: '', tasks: [], todayActions: [], rawData: {} as FrameworkRawData }}
+              isTop={fw.id === 'eat-the-frog'}
+              variant="grid"
+            />
+          ))}
+        </div>
+      </Section>
+
+      <HandDrawnDivider variant="scribble" label="📋 TODAY PLAN PANEL" />
+      <Section title="TodayPlanPanel">
+        <div className="max-w-xs">
+          <TodayPlanPanel actions={[
+            'Mulai bab 3 dengan outline 30 menit',
+            'Reply email klien sebelum jam 12',
+            'Review PR yang sudah pending 2 hari',
+          ]} />
         </div>
       </Section>
 

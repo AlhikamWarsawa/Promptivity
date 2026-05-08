@@ -9,6 +9,7 @@ import { PTCard } from '@/components/pt/PTCard';
 import { HandDrawnDivider } from '@/components/pt/HandDrawnDivider';
 import { FRAMEWORK_LIST } from '@/lib/frameworkConfig';
 import { PTStorage } from '@/lib/storage';
+import { PTLogo, MotiMascot } from '@/components/pt/icons';
 
 /* ============================================
    PT Welcome Page
@@ -214,22 +215,19 @@ function HeroSection({
               </span>
             </motion.div>
 
-            {/* Main tagline */}
+            {/* Main tagline (Typewriter) */}
             <motion.div variants={itemVariants}>
               <h1
-                className="leading-tight"
+                className="leading-tight flex flex-col"
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: 'clamp(2.5rem, 6vw, 4rem)',
                   color: 'var(--pt-black)',
                   lineHeight: 1.1,
+                  minHeight: '2.2em', // Reserve space to avoid layout shift
                 }}
               >
-                Tell your story.
-                <br />
-                <span style={{ color: 'var(--pt-brown)' }}>
-                  We build your mission.
-                </span>
+                <TypewriterText text="Turn your messy thoughts into clear action." />
               </h1>
             </motion.div>
 
@@ -283,14 +281,14 @@ function HeroSection({
           </motion.div>
 
           {/* Right: Mascot / Illustration */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85, rotate: -3 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
-            className="flex justify-center lg:justify-end"
-          >
-            <PTMascotIllustration />
-          </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, rotate: -3 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
+              className="flex justify-center lg:justify-end"
+            >
+              <PTMascotIllustration />
+            </motion.div>
         </div>
       </div>
     </section>
@@ -545,14 +543,14 @@ function FrameworkPreviewSection() {
           </span>
           <div className="flex gap-1">
             {FRAMEWORK_LIST.slice(3).map((fw) => (
-              <span
-                key={fw.id}
-                title={fw.name}
-                className="text-xl"
-                aria-label={fw.name}
-              >
-                {fw.icon}
-              </span>
+                <span
+                  key={fw.id}
+                  title={fw.name}
+                  className="inline-flex"
+                  aria-label={fw.name}
+                >
+                  {fw.icon && <fw.icon size={20} />}
+                </span>
             ))}
           </div>
         </motion.div>
@@ -575,7 +573,9 @@ function FrameworkPreviewCard({
       className="h-full"
     >
       {/* Icon */}
-      <div className="text-5xl mb-4">{framework.icon}</div>
+      <div className="mb-4">
+        {framework.icon && <framework.icon size={64} />}
+      </div>
 
       {/* Framework name */}
       <h3
@@ -807,173 +807,40 @@ function PageFooter() {
 
 /* ============================================
    VISUAL COMPONENTS
-   (Mascot, Logo, Background, Wave)
+   (Typewriter, Mascot, Logo, Background, Wave)
    ============================================ */
 
-/**
- * PTLogo — SVG logo sketch style
- * "PT" dalam kotak dengan border sketch
- */
-function PTLogo({ size = 32 }: { size?: number }) {
+function TypewriterText({ text }: { text: string }) {
+  const [displayedText, setDisplayedText] = useState('');
+
+  useEffect(() => {
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayedText(text.substring(0, i));
+      i++;
+      if (i > text.length) clearInterval(interval);
+    }, 50);
+    return () => clearInterval(interval);
+  }, [text]);
+
   return (
-    <div
-      style={{ width: size, height: size }}
-      className="relative shrink-0 rounded-sketch border-2 border-pt-black shadow-sketch-sm overflow-hidden bg-pt-yellow"
-    >
-      <Image
-        src="/promptivity.png"
-        alt="Promptivity Logo"
-        fill
-        className="object-cover"
-        sizes={`${size}px`}
+    <span>
+      {displayedText}
+      <motion.span
+        animate={{ opacity: [1, 0] }}
+        transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+        className="inline-block w-[0.1em] h-[0.9em] bg-pt-coral ml-[0.05em] align-middle"
       />
-    </div>
+    </span>
   );
 }
 
-/**
- * PTMascotIllustration — SVG mascot untuk hero section
- * Karakter storyteller kecil yang sedang menulis/bercerita
- * Style: kids book, hand-drawn, MS Paint vibe
- */
+// PTLogo component is now imported from @/components/pt/icons
+
 function PTMascotIllustration() {
   return (
     <div className="relative">
-      {/* Main illustration container */}
-      <motion.div
-        animate={{
-          y: [0, -8, 0],
-        }}
-        transition={{
-          duration: 3,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      >
-        <svg
-          width="320"
-          height="340"
-          viewBox="0 0 320 340"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-label="Moti, maskot Promptivity"
-          className="w-full max-w-[320px]"
-        >
-          {/* ---- BACKGROUND CARD (notebook) ---- */}
-          <rect
-            x="40" y="60" width="240" height="260"
-            rx="8"
-            fill="#F3F3F1"
-            stroke="#2B2B2B"
-            strokeWidth="2.5"
-          />
-          {/* Shadow */}
-          <rect
-            x="45" y="65" width="240" height="260"
-            rx="8"
-            fill="#2B2B2B"
-            opacity="0.08"
-          />
-          {/* Notebook lines */}
-          {[100, 120, 140, 160, 180, 200, 220, 240, 260, 280].map((y) => (
-            <line
-              key={y}
-              x1="65" y1={y} x2="255" y2={y}
-              stroke="#2B2B2B"
-              strokeWidth="1"
-              opacity="0.12"
-            />
-          ))}
-          {/* Notebook red margin line */}
-          <line
-            x1="85" y1="70" x2="85" y2="310"
-            stroke="#F04E59"
-            strokeWidth="1.5"
-            opacity="0.4"
-          />
-          {/* Spiral rings on top */}
-          {[80, 110, 140, 170, 200, 230].map((x) => (
-            <ellipse
-              key={x}
-              cx={x} cy="62"
-              rx="7" ry="10"
-              fill="none"
-              stroke="#2B2B2B"
-              strokeWidth="2"
-            />
-          ))}
-
-          {/* ---- HANDWRITTEN TEXT LINES (decorative) ---- */}
-          {/* Line 1 — yellow highlight */}
-          <rect x="92" y="94" width="140" height="12" rx="2" fill="#F6E37A" opacity="0.8" />
-          <line x1="92" y1="100" x2="232" y2="100" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" />
-          {/* Line 2 */}
-          <line x1="92" y1="120" x2="210" y2="120" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
-          {/* Line 3 */}
-          <line x1="92" y1="140" x2="225" y2="140" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
-          {/* Line 4 */}
-          <line x1="92" y1="160" x2="195" y2="160" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-
-          {/* ---- TASK CHECKBOXES (decorative) ---- */}
-          {/* Checkbox 1 — checked */}
-          <rect x="92" y="178" width="12" height="12" rx="2" fill="#17B66A" stroke="#2B2B2B" strokeWidth="1.5" />
-          <polyline points="94,184 97,188 102,181" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <line x1="110" y1="184" x2="195" y2="184" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-          {/* Strikethrough */}
-          <line x1="110" y1="184" x2="195" y2="184" stroke="#2B2B2B" strokeWidth="1" opacity="0.3" />
-
-          {/* Checkbox 2 — checked */}
-          <rect x="92" y="198" width="12" height="12" rx="2" fill="#17B66A" stroke="#2B2B2B" strokeWidth="1.5" />
-          <polyline points="94,204 97,208 102,201" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <line x1="110" y1="204" x2="215" y2="204" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-
-          {/* Checkbox 3 — unchecked, priority coral */}
-          <rect x="92" y="218" width="12" height="12" rx="2" fill="white" stroke="#F04E59" strokeWidth="2" />
-          <line x1="110" y1="224" x2="220" y2="224" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
-          {/* Priority dot */}
-          <circle cx="238" cy="224" r="5" fill="#F04E59" />
-
-          {/* Checkbox 4 — unchecked */}
-          <rect x="92" y="238" width="12" height="12" rx="2" fill="white" stroke="#2B2B2B" strokeWidth="1.5" />
-          <line x1="110" y1="244" x2="200" y2="244" stroke="#2B2B2B" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-
-          {/* ---- CHARACTER MASCOT (top right) ---- */}
-          {/* Body */}
-          <ellipse cx="225" cy="50" rx="30" ry="32" fill="#F6E37A" stroke="#2B2B2B" strokeWidth="2.5" />
-          {/* Eyes */}
-          <circle cx="215" cy="44" r="4" fill="white" stroke="#2B2B2B" strokeWidth="2" />
-          <circle cx="235" cy="44" r="4" fill="white" stroke="#2B2B2B" strokeWidth="2" />
-          <circle cx="216" cy="45" r="2" fill="#2B2B2B" />
-          <circle cx="236" cy="45" r="2" fill="#2B2B2B" />
-          {/* Smile */}
-          <path d="M213,56 Q225,64 237,56" stroke="#2B2B2B" strokeWidth="2" strokeLinecap="round" fill="none" />
-          {/* Blush */}
-          <ellipse cx="210" cy="54" rx="5" ry="3" fill="#F04E59" opacity="0.3" />
-          <ellipse cx="240" cy="54" rx="5" ry="3" fill="#F04E59" opacity="0.3" />
-          {/* Pencil in hand */}
-          <rect x="248" y="58" width="5" height="28" rx="2" fill="#F5D60D" stroke="#2B2B2B" strokeWidth="1.5" transform="rotate(25 248 58)" />
-          <polygon points="255,82 259,88 251,88" fill="#F3F3F1" stroke="#2B2B2B" strokeWidth="1" transform="rotate(25 255 82)" />
-          <rect x="249" y="56" width="5" height="4" rx="1" fill="#F04E59" stroke="#2B2B2B" strokeWidth="1" transform="rotate(25 249 56)" />
-
-          {/* ---- FLOATING BADGES (decorative) ---- */}
-          {/* GTD badge */}
-          <rect x="8" y="100" width="42" height="20" rx="4" fill="#2196E8" stroke="#2B2B2B" strokeWidth="1.5" />
-          <text x="29" y="114" textAnchor="middle" fontFamily="'DM Sans', sans-serif" fontSize="9" fontWeight="700" fill="white">GTD</text>
-
-          {/* Pomodoro badge */}
-          <rect x="268" y="140" width="48" height="20" rx="4" fill="#F28C28" stroke="#2B2B2B" strokeWidth="1.5" />
-          <text x="292" y="154" textAnchor="middle" fontFamily="'DM Sans', sans-serif" fontSize="8" fontWeight="700" fill="white">🍅 25min</text>
-
-          {/* Priority badge */}
-          <rect x="10" y="180" width="58" height="20" rx="4" fill="#F04E59" stroke="#2B2B2B" strokeWidth="1.5" />
-          <text x="39" y="194" textAnchor="middle" fontFamily="'DM Sans', sans-serif" fontSize="8" fontWeight="700" fill="white">🔴 Critical</text>
-
-          {/* OKR badge */}
-          <rect x="268" y="200" width="44" height="20" rx="4" fill="#17B66A" stroke="#2B2B2B" strokeWidth="1.5" />
-          <text x="290" y="214" textAnchor="middle" fontFamily="'DM Sans', sans-serif" fontSize="9" fontWeight="700" fill="white">OKRs</text>
-        </svg>
-      </motion.div>
-
+      <MotiMascot size={280} />
       {/* Floating stars decoration */}
       <FloatingStar x={10} y={20} delay={0} />
       <FloatingStar x={290} y={60} delay={0.5} size={16} />

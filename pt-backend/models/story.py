@@ -6,7 +6,7 @@ class PersonalizationData(BaseModel):
     role:            str            = "lainnya"
     bigGoal:         Optional[str]  = None
     currentProblem:  Optional[str]  = None
-    energyPattern:   str            = "variable"    # morning | night | variable
+    energyPattern:   str            = "mixed"       # morning | night | mixed
     preferredStyle:  str            = "flexible"    # structured | flexible
 
 class ProcessStoryRequest(BaseModel):

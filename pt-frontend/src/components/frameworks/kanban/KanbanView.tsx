@@ -113,7 +113,12 @@ export function KanbanView() {
         </div>
 
         {/* Drag overlay — shown while dragging */}
-        <DragOverlay>
+        <DragOverlay
+          dropAnimation={{
+            duration: 250,
+            easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+          }}
+        >
           {activeTask ? <KanbanCardOverlay task={activeTask} /> : null}
         </DragOverlay>
       </DndContext>

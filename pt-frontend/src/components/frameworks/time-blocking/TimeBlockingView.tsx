@@ -6,6 +6,7 @@ import { TimeBlock }            from './TimeBlock';
 import { FrameworkEmptyState }  from '@/components/frameworks/FrameworkPageLayout';
 import { getFramework }         from '@/lib/frameworkConfig';
 import { useFramework }         from '@/store/usePTStore';
+import PTStorage                from '@/lib/storage';
 
 /* ============================================
    TimeBlockingView — Daily schedule timeline
@@ -24,19 +25,21 @@ interface ScheduleSlot {
   priority?: string;
 }
 
-const DAY_START_HOUR = 6;
-const DAY_END_HOUR   = 22;
-const TOTAL_MINUTES  = (DAY_END_HOUR - DAY_START_HOUR) * 60;
 const PX_PER_MINUTE  = 1.4;  // Pixels per minute — adjust untuk density
-
-function timeToMinutes(time: string): number {
-  const [h, m] = time.split(':').map(Number);
-  return (h - DAY_START_HOUR) * 60 + (m || 0);
-}
 
 export function TimeBlockingView() {
   const fwData = useFramework('time-blocking');
   const meta   = getFramework('time-blocking');
+  const persona = PTStorage.getPersona();
+  const energy = persona?.energyPattern ?? 'mixed';
+
+  const { startHour, endHour } = useMemo(() => {
+    if (energy === 'morning') return { startHour: 7, endHour: 21 };
+    if (energy === 'night') return { startHour: 13, endHour: 23 };
+    return { startHour: 6, endHour: 22 };
+  }, [energy]);
+
+  const totalMinutes = (endHour - startHour) * 60;
 
   const schedule = useMemo((): ScheduleSlot[] => {
     if (!fwData?.rawData) return [];
@@ -48,18 +51,25 @@ export function TimeBlockingView() {
     return <FrameworkEmptyState frameworkId="time-blocking" message="Tidak ada jadwal yang berhasil diekstrak. Coba ceritakan lebih banyak tentang rutinitas harian, jam kerja, dan kapan kamu paling produktif." />;
   }
 
-  // Sort by time
-  const sortedSchedule = [...schedule].sort((a, b) =>
-    timeToMinutes(a.time) - timeToMinutes(b.time),
-  );
+  function localTimeToMinutes(time: string): number {
+    const [h, m] = time.split(':').map(Number);
+    return (h - startHour) * 60 + (m || 0);
+  }
 
-  const totalHeight = TOTAL_MINUTES * PX_PER_MINUTE;
+  // Sort by time
+  const sortedSchedule = [...schedule].sort((a, b) => {
+    const [ah, am] = a.time.split(':').map(Number);
+    const [bh, bm] = b.time.split(':').map(Number);
+    return (ah * 60 + am) - (bh * 60 + bm);
+  });
+
+  const totalHeight = totalMinutes * PX_PER_MINUTE;
 
   // Hour markers for the axis
   const hourMarkers = Array.from(
-    { length: DAY_END_HOUR - DAY_START_HOUR + 1 },
+    { length: endHour - startHour + 1 },
     (_, i) => ({
-      hour:      DAY_START_HOUR + i,
+      hour:      startHour + i,
       yPosition: i * 60 * PX_PER_MINUTE,
     }),
   );
@@ -73,11 +83,15 @@ export function TimeBlockingView() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="mb-5 p-3 rounded-sketch border-2 border-pt-black text-sm"
+        className="mb-5 p-3 rounded-sketch border-2 border-pt-black text-sm flex items-center justify-between gap-4"
         style={{ backgroundColor: '#E9B12A' + '20', fontFamily: 'var(--font-body)', color: '#4B4B4B' }}
       >
-        📅 Jadwal di bawah adalah <strong>rekomendasi Moti</strong> berdasarkan ceritamu.
-        Sesuaikan dengan kondisi aktual harianmu.
+        <span>
+          📅 Jadwal di bawah adalah <strong>rekomendasi Moti</strong> berdasarkan ceritamu.
+        </span>
+        <div className="shrink-0 px-2 py-1 rounded-full bg-pt-green/20 border border-pt-green/30 text-[10px] font-bold text-pt-green uppercase tracking-wider">
+          ⚡ Optimized for {energy} energy
+        </div>
       </motion.div>
 
       {/* Legend */}
@@ -149,11 +163,11 @@ export function TimeBlockingView() {
           ))}
 
           {/* Current time indicator */}
-          <CurrentTimeIndicator />
+          <CurrentTimeIndicator startHour={startHour} totalMinutes={totalMinutes} />
 
           {/* Time blocks */}
           {sortedSchedule.map((slot, i) => {
-            const topOffset = timeToMinutes(slot.time) * PX_PER_MINUTE;
+            const topOffset = localTimeToMinutes(slot.time) * PX_PER_MINUTE;
 
             return (
               <div
@@ -204,12 +218,12 @@ export function TimeBlockingView() {
 }
 
 /* ---- Current Time Indicator ---- */
-function CurrentTimeIndicator() {
+function CurrentTimeIndicator({ startHour, totalMinutes }: { startHour: number; totalMinutes: number }) {
   const now = new Date();
   const minutesSinceDayStart =
-    (now.getHours() - DAY_START_HOUR) * 60 + now.getMinutes();
+    (now.getHours() - startHour) * 60 + now.getMinutes();
 
-  if (minutesSinceDayStart < 0 || minutesSinceDayStart > TOTAL_MINUTES) return null;
+  if (minutesSinceDayStart < 0 || minutesSinceDayStart > totalMinutes) return null;
   const top = minutesSinceDayStart * PX_PER_MINUTE;
 
   return (

@@ -25,6 +25,29 @@ import type {
 } from '@/types/pt.types';
 import { FRAMEWORK_IDS } from '@/lib/frameworkConfig';
 
+/* ============================================
+   Edge case helpers
+   ============================================ */
+
+/** Ensure a string value is not one of these fallback markers */
+function isRealValue(val: unknown): boolean {
+  if (typeof val !== 'string') return false;
+  const EMPTY_MARKERS = [
+    'To be defined', 'Not specified', 'N/A', 'TBD', 'None',
+    'null', 'undefined', '', 'no data', 'N/A.',
+  ];
+  return !EMPTY_MARKERS.includes(val.trim());
+}
+
+/** Safely parse a date string, return undefined if invalid */
+function safeDate(val: unknown): string | undefined {
+  if (typeof val !== 'string' || !val.trim()) return undefined;
+  // Accept descriptive dates too ("Akhir bulan", "Next week")
+  if (val.length < 4) return undefined;
+  return val.trim();
+}
+
+
 // ---- Safe string helper ----
 function safeStr(val: unknown, fallback = ''): string {
   if (typeof val === 'string' && val.trim().length > 0) return val.trim();
@@ -75,7 +98,7 @@ export function parseTask(raw: unknown, frameworkId: FrameworkId = 'gtd'): Task 
     description:      safeStr(obj.description),
     priority:         safePriority(obj.priority),
     estimatedMinutes: safeNum(obj.estimatedMinutes, 30, 5, 480),
-    deadline:         safeStr(obj.deadline) || undefined,
+    deadline:         safeDate(obj.deadline),    // ← Use safeDate instead of safeStr
     category:         safeStr(obj.category, 'general'),
     isCompleted:      safeBool(obj.isCompleted, false),
     framework:        isValidFrameworkId(obj.framework) ? obj.framework : frameworkId,
@@ -92,7 +115,7 @@ function parseTasks(raw: unknown, frameworkId: FrameworkId): Task[] {
 /* ============================================
    parseFrameworkOutput — Parse satu framework
    ============================================ */
-function parseFrameworkOutput(
+export function parseFrameworkOutput(
   frameworkId: FrameworkId,
   raw:         unknown,
 ): FrameworkOutput {
@@ -178,14 +201,24 @@ function parseFrameworkRawData(
       };
 
     case 'eat-the-frog': {
-      const frogRaw = (obj.frog as Record<string, unknown>) ?? {};
+      // frog bisa jadi object atau string (edge case dari Gemini output lama)
+      const frogRaw = obj.frog;
+      let frogObj: Record<string, unknown> = {};
+
+      if (typeof frogRaw === 'string') {
+        // Gemini kadang return string — konversi ke object
+        frogObj = { title: frogRaw, reason: 'This is your most important task.', estimatedMinutes: 90 };
+      } else if (typeof frogRaw === 'object' && frogRaw !== null) {
+        frogObj = frogRaw as Record<string, unknown>;
+      }
+
       return {
         frog: {
-          title:            safeStr(frogRaw.title, 'Your most important task today'),
-          reason:           safeStr(frogRaw.reason, 'This is your highest priority item.'),
-          estimatedMinutes: safeNum(frogRaw.estimatedMinutes, 90, 15, 480),
+          title:            safeStr(frogObj.title, 'Your most important task today'),
+          reason:           safeStr(frogObj.reason, 'This is your highest priority item.'),
+          estimatedMinutes: safeNum(frogObj.estimatedMinutes, 90, 15, 480),
           priority:         'critical' as Priority,
-          category:         safeStr(frogRaw.category, 'work'),
+          category:         safeStr(frogObj.category, 'work'),
         },
         secondaryTasks: parseTasks(obj.secondaryTasks, 'eat-the-frog'),
       };
@@ -239,10 +272,10 @@ function parseFrameworkRawData(
         keyResults: safeArr(obj.keyResults).map((kr: unknown) => {
           const k = (kr as Record<string, unknown>) ?? {};
           return {
-            kr:       safeStr(k.kr, 'Key result'),
-            metric:   safeStr(k.metric, 'To be defined'),
-            deadline: safeStr(k.deadline, ''),
-            progress: safeNum(k.progress, 0, 0, 100),
+            kr:       safeStr(k.kr, 'Key result to be defined'),
+            metric:   isRealValue(k.metric) ? safeStr(k.metric) : 'To be defined',
+            deadline: safeDate(k.deadline) ?? '',
+            progress: safeNum(k.progress, 0, 0, 100),    // always default 0
           };
         }),
       };
@@ -276,15 +309,15 @@ function parseFrameworkRawData(
         goals: safeArr(obj.goals).map((g: unknown) => {
           const goal = (g as Record<string, unknown>) ?? {};
           return {
-            title:      safeStr(goal.title, 'Your goal'),
-            specific:   safeStr(goal.specific,   'To be defined'),
-            measurable: safeStr(goal.measurable, 'To be defined'),
-            achievable: safeStr(goal.achievable, 'To be defined'),
-            relevant:   safeStr(goal.relevant,   'To be defined'),
-            timeBound:  safeStr(goal.timeBound,  'To be defined'),
+            title:      safeStr(goal.title, 'Untitled Goal'),
+            specific:   isRealValue(goal.specific)   ? safeStr(goal.specific)   : 'To be defined',
+            measurable: isRealValue(goal.measurable) ? safeStr(goal.measurable) : 'To be defined',
+            achievable: isRealValue(goal.achievable) ? safeStr(goal.achievable) : 'To be defined',
+            relevant:   isRealValue(goal.relevant)   ? safeStr(goal.relevant)   : 'To be defined',
+            timeBound:  isRealValue(goal.timeBound)  ? safeStr(goal.timeBound)  : 'To be defined',
             progress:   safeNum(goal.progress, 0, 0, 100),
           };
-        }),
+        }).filter((g) => g.title !== 'Untitled Goal' || isRealValue(g.specific)),
       };
 
     case 'para':
@@ -338,17 +371,44 @@ function parseFrameworksArray(raw: unknown): FrameworkOutput[] {
   let frameworksMap: Record<string, unknown> = {};
 
   if (Array.isArray(raw)) {
-    // Array format: [{ frameworkId: 'gtd', ... }, ...]
+    // Array format: [{ frameworkId: 'gtd', ... }, ...] OR [{ id: 'gtd', score: 90, ... }]
     for (const item of raw) {
       if (typeof item === 'object' && item !== null) {
         const obj = item as Record<string, unknown>;
-        const id  = safeStr(obj.frameworkId);
+        const id  = safeStr(obj.frameworkId || obj.id);
         if (id) frameworksMap[id] = obj;
       }
     }
   } else if (typeof raw === 'object' && raw !== null) {
     // Object format: { gtd: {...}, kanban: {...}, ... }
     frameworksMap = raw as Record<string, unknown>;
+  }
+
+  // Normalisasi: kadang Gemini wrap tasks langsung di framework level
+  // contoh: frameworks.kanban.tasks = [...] instead of frameworks.kanban.backlog = [...]
+  for (const fwId of FRAMEWORK_IDS) {
+    const fw = frameworksMap[fwId] as Record<string, unknown> | undefined;
+    if (!fw) continue;
+
+    // If kanban has "tasks" instead of backlog/inProgress/done
+    if (fwId === 'kanban' && !fw.backlog && Array.isArray(fw.tasks)) {
+      fw.backlog = fw.tasks;
+      fw.inProgress = [];
+      fw.done = [];
+    }
+
+    // If eat-the-frog has tasks array instead of frog object
+    if (fwId === 'eat-the-frog' && !fw.frog && Array.isArray(fw.tasks) && fw.tasks.length > 0) {
+      const firstTask = fw.tasks[0] as Record<string, unknown>;
+      fw.frog = {
+        title:            firstTask.title ?? 'Your most important task',
+        reason:           'This is your highest priority task.',
+        estimatedMinutes: firstTask.estimatedMinutes ?? 90,
+        priority:         'critical',
+        category:         firstTask.category ?? 'work',
+      };
+      fw.secondaryTasks = fw.tasks.slice(1);
+    }
   }
 
   // Build output list, ensure all 13 exist

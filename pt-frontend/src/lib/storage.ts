@@ -15,6 +15,9 @@ export const STORAGE_KEYS = {
   SKIP_LOGIN:        'pt_skip_login',
   STORY_DRAFT:       'pt_story_draft',    // Draft cerita yang belum disubmit
   WEEKLY_REFLECTION: 'pt_weekly_reflection', // Personal reflection notes (Weekly Review)
+  CONFUSED_MESSAGES: 'pt_confused_messages', // History percakapan Confused Mode
+  JOURNAL_INDEX:     'pt_journal_index',     // List of dates with sessions
+  SESSION_BY_DATE:   'pt_session_',          // Prefix for session by date: pt_session_YYYY-MM-DD
 } as const;
 
 type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
@@ -166,6 +169,54 @@ export function getWeeklyReflection(): string {
   return load<string>(STORAGE_KEYS.WEEKLY_REFLECTION) ?? '';
 }
 
+// ---- Confused Messages ----
+
+export function getConfusedMessages(): { role: 'user' | 'model'; content: string }[] {
+  return load<{ role: 'user' | 'model'; content: string }[]>(STORAGE_KEYS.CONFUSED_MESSAGES) ?? [];
+}
+
+export function saveConfusedMessages(messages: { role: 'user' | 'model'; content: string }[]): void {
+  save(STORAGE_KEYS.CONFUSED_MESSAGES, messages);
+}
+
+export function clearConfusedMessages(): void {
+  remove(STORAGE_KEYS.CONFUSED_MESSAGES);
+}
+
+// ---- Journal ----
+
+/**
+ * Save a session by date (YYYY-MM-DD).
+ * Also updates the journal index.
+ */
+export function saveSessionByDate(date: string, session: PTSession): void {
+  const key = `${STORAGE_KEYS.SESSION_BY_DATE}${date}`;
+  
+  // Load existing sessions for this date
+  const existing = load<PTSession[]>(key) ?? [];
+  
+  // To avoid duplicates of the same session (by sessionId), though unlikely here
+  const updated = [...existing.filter(s => s.sessionId !== session.sessionId), session];
+  
+  save(key, updated);
+  
+  // Update index
+  const index = load<string[]>(STORAGE_KEYS.JOURNAL_INDEX) ?? [];
+  if (!index.includes(date)) {
+    index.push(date);
+    save(STORAGE_KEYS.JOURNAL_INDEX, index.sort());
+  }
+}
+
+export function getSessionsByDate(date: string): PTSession[] {
+  const key = `${STORAGE_KEYS.SESSION_BY_DATE}${date}`;
+  return load<PTSession[]>(key) ?? [];
+}
+
+export function getAllSessionDates(): string[] {
+  return load<string[]>(STORAGE_KEYS.JOURNAL_INDEX) ?? [];
+}
+
 // ---- PTStorage Namespace Object (untuk backward compat & convenience) ----
 
 export const PTStorage = {
@@ -195,6 +246,14 @@ export const PTStorage = {
   // Keys & defaults
   KEYS: STORAGE_KEYS,
   DEFAULT_PERSONA,
+  // Confused Messages
+  saveConfusedMessages,
+  getConfusedMessages,
+  clearConfusedMessages,
+  // Journal
+  saveSessionByDate,
+  getSessionsByDate,
+  getAllSessionDates,
 } as const;
 
 export default PTStorage;

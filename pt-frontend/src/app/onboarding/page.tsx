@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { PTButton } from '@/components/pt/PTButton';
@@ -7,6 +8,7 @@ import { PTCard } from '@/components/pt/PTCard';
 import { HandDrawnDivider } from '@/components/pt/HandDrawnDivider';
 import PTStorage from '@/lib/storage';
 import { OnboardingTopBar } from '@/components/pt/OnboardingTopBar';
+import { usePTStore } from '@/store/usePTStore';
 
 /* ============================================
    /onboarding — Decision Screen
@@ -31,7 +33,7 @@ export default function OnboardingDecisionPage() {
       PTStorage.savePersona(PTStorage.DEFAULT_PERSONA);
     }
     PTStorage.setSkipLogin();
-    router.push('/onboarding/brain-dump');
+    router.push('/onboarding/input-method');
   }
 
   const containerVariants = {

@@ -92,12 +92,21 @@ export function EisenhowerQuadrant({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.94 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{
-        delay:    index * 0.1,
-        duration: 0.4,
-        ease:     [0.22, 1, 0.36, 1],
+      initial="hidden"
+      animate="visible"
+      variants={{
+        hidden: { opacity: 0, scale: 0.8 },
+        visible: {
+          opacity: 1,
+          scale: 1,
+          transition: {
+            delay: index * 0.1,
+            duration: 0.4,
+            ease: [0.22, 1, 0.36, 1],
+            staggerChildren: 0.08,
+            delayChildren: (index * 0.1) + 0.2,
+          },
+        },
       }}
       className="rounded-sketch border-2 border-pt-black overflow-hidden flex flex-col"
       style={{
@@ -166,13 +175,21 @@ export function EisenhowerQuadrant({
             </p>
           </div>
         ) : (
-          tasks.map((task) => (
-            <TaskCard
+          tasks.map((task, i) => (
+            <motion.div
               key={task.id}
-              task={task}
-              onToggle={toggleTask}
-              compact
-            />
+              variants={{
+                hidden: { opacity: 0, scale: 0.8, y: 10 },
+                visible: { opacity: 1, scale: 1, y: 0 },
+              }}
+              transition={{ duration: 0.3, type: 'spring' }}
+            >
+              <TaskCard
+                task={task}
+                onToggle={toggleTask}
+                compact
+              />
+            </motion.div>
           ))
         )}
       </div>

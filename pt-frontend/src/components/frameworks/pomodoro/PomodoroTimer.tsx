@@ -146,83 +146,73 @@ export function PomodoroTimer({
         )}
       </AnimatePresence>
 
-      {/* Tomato with progress */}
-      <div className="flex justify-center mb-4">
-        <AnimatePresence mode="wait">
-          {isDone ? (
-            <motion.div
-              key="done"
-              initial={{ scale: 0.5, rotate: -20 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="text-7xl"
-              role="img"
-              aria-label={mode === 'work' ? 'Sesi kerja selesai!' : 'Istirahat selesai!'}
-            >
-              {mode === 'work' ? '🎉' : '⚡'}
-            </motion.div>
-          ) : (
-            <motion.div key="timer">
-              <TomatoSVG
-                size={140}
-                isActive={isRunning}
-                progress={progress}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Timer Display Area (Conic Gradient Ring + Center Content) */}
+      <div className="flex justify-center mb-8 mt-4 relative">
+        <div
+          className="relative flex items-center justify-center rounded-full"
+          style={{
+            width: '240px',
+            height: '240px',
+            background: `conic-gradient(var(--pt-${mode === 'work' ? 'coral' : 'green'}) ${progress * 100}%, var(--pt-cream) ${progress * 100}%)`,
+            boxShadow: '4px 4px 0px #2B2B2B',
+            border: '2px solid #2B2B2B',
+          }}
+        >
+          {/* Inner circle for content */}
+          <div
+            className="absolute inset-0 m-3 rounded-full bg-white flex flex-col items-center justify-center border-2 border-pt-black"
+            style={{ zIndex: 10 }}
+          >
+            <AnimatePresence mode="wait">
+              {isDone ? (
+                <motion.div
+                  key="done"
+                  initial={{ scale: 0.5, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-6xl flex flex-col items-center gap-2"
+                >
+                  {mode === 'work' ? '🎉' : '⚡'}
+                  <p className="text-sm font-display mt-2 text-pt-black">
+                    {mode === 'work' ? 'Sesi Selesai!' : 'Siap Fokus!'}
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="countdown"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center"
+                >
+                  <TomatoSVG size={60} isActive={isRunning} progress={1} className="mb-2" />
+                  <motion.p
+                    animate={isRunning && secondsLeft <= 60
+                      ? { color: ['var(--pt-coral)', '#2B2B2B', 'var(--pt-coral)'] }
+                      : { color: 'var(--pt-black)' }
+                    }
+                    transition={{ duration: 1, repeat: Infinity }}
+                    style={{
+                      fontFamily:    'var(--font-display)',
+                      fontSize:      '3.5rem',
+                      lineHeight:    1,
+                      letterSpacing: '0.05em',
+                    }}
+                    aria-live="polite"
+                  >
+                    {mm}:{ss}
+                  </motion.p>
+                  <p
+                    className="text-xs font-bold uppercase tracking-widest mt-1"
+                    style={{ fontFamily: 'var(--font-body)', color: '#9B9B9B' }}
+                  >
+                    {mode === 'work' ? 'Fokus' : 'Istirahat'}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
-
-      {/* Countdown display */}
-      <AnimatePresence mode="wait">
-        {!isDone ? (
-          <motion.div
-            key="countdown"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-          >
-            <motion.p
-              animate={isRunning && secondsLeft <= 60
-                ? { color: ['var(--pt-coral)', '#2B2B2B', 'var(--pt-coral)'] }
-                : { color: 'var(--pt-black)' }
-              }
-              transition={{ duration: 1, repeat: Infinity }}
-              style={{
-                fontFamily:    'var(--font-display)',
-                fontSize:      '3.5rem',
-                lineHeight:    1,
-                letterSpacing: '0.05em',
-              }}
-              aria-live="polite"
-              aria-label={`${mm} menit ${ss} detik tersisa`}
-            >
-              {mm}:{ss}
-            </motion.p>
-            <p
-              className="text-sm mt-1"
-              style={{ fontFamily: 'var(--font-body)', color: '#9B9B9B' }}
-            >
-              {mode === 'work' ? 'Waktu fokus' : 'Waktu istirahat'}
-            </p>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="done-msg"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <p
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize:   'var(--text-h3)',
-                color:      mode === 'work' ? 'var(--pt-coral)' : 'var(--pt-green)',
-              }}
-            >
-              {mode === 'work' ? 'Sesi Selesai! 🍅' : 'Siap Fokus Lagi! ⚡'}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Controls */}
       <div className="flex justify-center gap-3 mt-5 flex-wrap">

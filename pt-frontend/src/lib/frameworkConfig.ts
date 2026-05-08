@@ -1,4 +1,6 @@
+import React from 'react';
 import type { FrameworkId } from '@/types/pt.types';
+import * as Icons from '@/components/pt/icons';
 
 export interface FrameworkMeta {
   id: FrameworkId;
@@ -8,7 +10,7 @@ export interface FrameworkMeta {
   description: string;
   accentColor: string;        // CSS hex color dari palette PT
   bgColor: string;            // Background warna muda/pastel untuk card
-  icon: string;               // Emoji placeholder, diganti SVG nanti di Day 15
+  icon: React.ElementType;    // Custom SVG Component
   route: string;
   bestFor: string[];          // Tipe user yang cocok
   keywords: string[];         // Keyword yang AI pakai untuk match ke story
@@ -23,7 +25,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'GTD membantu kamu menangkap semua pikiran dan tugas ke dalam sistem terpercaya, sehingga otak bebas untuk fokus mengerjakan — bukan mengingat.',
     accentColor: '#2196E8',
     bgColor: '#E8F4FD',
-    icon: '📁',
+    icon: Icons.GTDIcon,
     route: '/frameworks/gtd',
     bestFor: ['structured', 'profesional', 'mahasiswa'],
     keywords: ['banyak tugas', 'overwhelmed', 'lupa', 'inbox penuh', 'proyek besar'],
@@ -36,7 +38,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Kanban menggunakan board visual tiga kolom (Backlog, In Progress, Done) untuk mengelola alur kerja dengan jelas dan mencegah multitasking berlebihan.',
     accentColor: '#35D5F4',
     bgColor: '#E0F9FE',
-    icon: '📋',
+    icon: Icons.KanbanIcon,
     route: '/frameworks/kanban',
     bestFor: ['flexible', 'freelancer', 'tim'],
     keywords: ['alur kerja', 'sprint', 'progres', 'banyak project', 'kolaborasi'],
@@ -49,7 +51,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Time Blocking mengalokasikan setiap jam harimu ke tugas spesifik — tidak ada waktu yang terbuang tanpa tujuan.',
     accentColor: '#E9B12A',
     bgColor: '#FDF5E0',
-    icon: '🕐',
+    icon: Icons.TimeBlockingIcon,
     route: '/frameworks/time-blocking',
     bestFor: ['structured', 'morning', 'profesional'],
     keywords: ['deadline ketat', 'manajemen waktu', 'jadwal padat', 'distraksi'],
@@ -62,7 +64,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Kerjakan tugas terberat dan paling penting di pagi hari pertama kali. Setelah "katak" termakan, sisa hari terasa ringan.',
     accentColor: '#F04E59',
     bgColor: '#FEE8EA',
-    icon: '🐸',
+    icon: Icons.EatTheFrogIcon,
     route: '/frameworks/eat-the-frog',
     bestFor: ['procrastinator', 'mahasiswa', 'flexible'],
     keywords: ['prokrastinasi', 'takut mulai', 'tugas besar', 'menunda'],
@@ -75,7 +77,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Kerja dalam sesi fokus 25 menit, istirahat 5 menit, ulangi. Teknik ini melatih konsentrasi dan mencegah burnout.',
     accentColor: '#F28C28',
     bgColor: '#FEF0E0',
-    icon: '🍅',
+    icon: Icons.PomodoroIcon,
     route: '/frameworks/pomodoro',
     bestFor: ['distracted', 'mahasiswa', 'freelancer'],
     keywords: ['distraksi', 'susah fokus', 'kelelahan', 'ADHD', 'belajar'],
@@ -88,7 +90,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Matriks 2x2 yang membagi tugas ke dalam 4 kuadran: Lakukan Sekarang, Jadwalkan, Delegasikan, atau Hapus.',
     accentColor: '#F5D60D',
     bgColor: '#FFFCE0',
-    icon: '⚡',
+    icon: Icons.EisenhowerIcon,
     route: '/frameworks/eisenhower',
     bestFor: ['structured', 'profesional', 'entrepreneur'],
     keywords: ['prioritas', 'keputusan', 'banyak permintaan', 'urgent vs penting'],
@@ -101,7 +103,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Systemist mendorong kamu membangun rutinitas dan sistem harian yang konsisten — bukan mengejar target sekali, tapi membangun habit jangka panjang.',
     accentColor: '#17B66A',
     bgColor: '#E0F8EE',
-    icon: '⚙️',
+    icon: Icons.SystemistIcon,
     route: '/frameworks/systemist',
     bestFor: ['structured', 'entrepreneur', 'self-improvement'],
     keywords: ['rutinitas', 'kebiasaan', 'konsisten', 'habit', 'sistem produktivitas'],
@@ -114,7 +116,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Pilih satu tugas utama per hari yang benar-benar bermakna, ditambah dua atau tiga tugas pendukung. Simpel, fokus, sustainable.',
     accentColor: '#9AD84B',
     bgColor: '#F0FADF',
-    icon: '🎯',
+    icon: Icons.MediumMethodIcon,
     route: '/frameworks/medium-method',
     bestFor: ['flexible', 'burnout', 'overwhelmed'],
     keywords: ['burnout', 'terlalu banyak', 'kesederhanaan', 'fokus harian'],
@@ -127,7 +129,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'OKR menetapkan satu Objective inspiratif dan 3–5 Key Results terukur untuk melacak kemajuan secara jelas dan ambisius.',
     accentColor: '#2196E8',
     bgColor: '#E8F4FD',
-    icon: '🏆',
+    icon: Icons.OKRIcon,
     route: '/frameworks/okrs',
     bestFor: ['entrepreneur', 'profesional', 'structured'],
     keywords: ['target besar', 'ambisi', 'KPI', 'growth', 'bisnis'],
@@ -140,7 +142,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Setiap akhir minggu, evaluasi apa yang selesai, apa yang macet, dan rencanakan minggu depan. Refleksi yang konsisten adalah kunci perbaikan berkelanjutan.',
     accentColor: '#E9DCCF',
     bgColor: '#FAF5EF',
-    icon: '📅',
+    icon: Icons.WeeklyReviewIcon,
     route: '/frameworks/weekly-review',
     bestFor: ['structured', 'self-improvement'],
     keywords: ['evaluasi', 'refleksi', 'minggu depan', 'review', 'introspeksi'],
@@ -153,7 +155,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'Buat daftar semua komitmenmu — pekerjaan, sosial, belajar, personal — lalu evaluasi mana yang perlu dilanjutkan, didelegasikan, atau dihapus.',
     accentColor: '#E9B12A',
     bgColor: '#FDF5E0',
-    icon: '📝',
+    icon: Icons.CommitmentInventoryIcon,
     route: '/frameworks/commitment-inventory',
     bestFor: ['overwhelmed', 'profesional', 'entrepreneur'],
     keywords: ['terlalu banyak komitmen', 'overcommit', 'burnout', 'susah bilang tidak'],
@@ -166,7 +168,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'SMART Goals memastikan setiap targetmu bersifat Specific, Measurable, Achievable, Relevant, dan Time-bound — bukan sekadar harapan kabur.',
     accentColor: '#35D5F4',
     bgColor: '#E0F9FE',
-    icon: '⭐',
+    icon: Icons.SMARTGoalsIcon,
     route: '/frameworks/smart-goals',
     bestFor: ['structured', 'mahasiswa', 'profesional'],
     keywords: ['target jelas', 'deadline', 'tujuan hidup', 'goal setting'],
@@ -179,7 +181,7 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     description: 'PARA mengorganisir semua informasi dan proyek ke dalam 4 kategori: Projects (aktif), Areas (tanggung jawab), Resources (referensi), Archives (tidak aktif).',
     accentColor: '#9AD84B',
     bgColor: '#F0FADF',
-    icon: '🗂️',
+    icon: Icons.PARAIcon,
     route: '/frameworks/para',
     bestFor: ['knowledge-worker', 'structured', 'profesional'],
     keywords: ['organisasi informasi', 'banyak dokumen', 'notes', 'knowledge management'],
@@ -187,7 +189,6 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
 };
 
 export const FRAMEWORK_LIST = Object.values(FRAMEWORKS);
-
 export const FRAMEWORK_IDS = Object.keys(FRAMEWORKS) as FrameworkId[];
 
 export function getFramework(id: FrameworkId): FrameworkMeta {

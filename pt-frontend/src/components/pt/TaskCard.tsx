@@ -81,13 +81,13 @@ export function TaskCard({
               width="12" height="12"
               viewBox="0 0 12 12"
               fill="none"
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               aria-hidden="true"
             >
-              <polyline
+              <motion.polyline
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                exit={{ pathLength: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
                 points="2,6 5,9 10,3"
                 stroke="white"
                 strokeWidth="2"
@@ -105,15 +105,18 @@ export function TaskCard({
         <div className="flex items-start justify-between gap-2">
           <p
             className={cn(
-              'font-semibold leading-snug',
+              'font-semibold leading-snug relative inline-block',
               compact ? 'text-sm' : 'text-body',
-              'transition-all duration-300',
-              isCompleted && 'line-through text-[#9B9B9B]',
+              'transition-colors duration-300',
+              isCompleted ? 'text-[#9B9B9B]' : 'text-pt-black',
             )}
             style={{
-              fontFamily:    'var(--font-body)',
-              color:         isCompleted ? '#9B9B9B' : 'var(--pt-black)',
-              textDecoration: isCompleted ? 'line-through' : 'none',
+              fontFamily: 'var(--font-body)',
+              backgroundImage: 'linear-gradient(currentColor, currentColor)',
+              backgroundSize: isCompleted ? '100% 2px' : '0% 2px',
+              backgroundPosition: '0 50%',
+              backgroundRepeat: 'no-repeat',
+              transition: 'background-size 0.3s ease-out, color 0.3s ease-out',
             }}
           >
             {task.title}

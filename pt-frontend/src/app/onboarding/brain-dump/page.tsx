@@ -11,6 +11,7 @@ import { HintCard }          from '@/components/pt/HintCard';
 import { PTCard }            from '@/components/pt/PTCard';
 import PTStorage             from '@/lib/storage';
 import { usePTStore }        from '@/store/usePTStore';
+import { MotiMascot }        from '@/components/pt/icons';
 import type { Personalization } from '@/types/pt.types';
 
 /* ============================================
@@ -561,11 +562,11 @@ function NudgeModal({
             >
               <div className="flex items-start gap-4">
                 <div
-                  className="shrink-0 w-14 h-14 rounded-sketch border-2 border-pt-black flex items-center justify-center text-3xl"
-                  style={{ backgroundColor: 'var(--pt-yellowP)' }}
+                  className="shrink-0 w-14 h-14 rounded-sketch border-2 border-pt-black flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--pt-white)' }}
                   aria-hidden="true"
                 >
-                  🧠
+                  <MotiMascot size={40} />
                 </div>
                 <div>
                   <h3

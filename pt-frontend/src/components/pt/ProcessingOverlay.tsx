@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MotiMascot } from './icons';
 
 /* ============================================
    ProcessingOverlay — Full-screen loading overlay
@@ -27,11 +28,9 @@ export interface ProcessingMessage {
 
 export const PT_PROCESSING_MESSAGES: ProcessingMessage[] = [
   { text: 'Reading your story...',              icon: '📖', durationMs: 2000 },
-  { text: 'Identifying your priorities...',     icon: '🎯', durationMs: 2000 },
-  { text: 'Building your mission...',           icon: '🏗️', durationMs: 2500 },
-  { text: 'Selecting the best frameworks...',   icon: '✨', durationMs: 2000 },
-  { text: 'Crafting your task breakdown...',    icon: '📋', durationMs: 2000 },
-  { text: 'Almost there...',                    icon: '⚡', durationMs: 1500 },
+  { text: 'Finding hidden patterns...',         icon: '🔍', durationMs: 2500 },
+  { text: 'Choosing the best frameworks...',    icon: '✨', durationMs: 2500 },
+  { text: 'Building your mission...',           icon: '🏗️', durationMs: 2000 },
 ];
 
 interface ProcessingOverlayProps {
@@ -231,10 +230,10 @@ function AnimatingStar() {
         className="absolute inset-0 flex items-center justify-center"
       >
         <div
-          className="w-12 h-12 rounded-sketch border-2 border-pt-black flex items-center justify-center text-2xl"
-          style={{ backgroundColor: 'var(--pt-yellow)' }}
+          className="w-12 h-12 rounded-sketch border-2 border-pt-black flex items-center justify-center"
+          style={{ backgroundColor: 'var(--pt-white)' }}
         >
-          🧠
+          <MotiMascot size={32} />
         </div>
       </motion.div>
     </motion.div>

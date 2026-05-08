@@ -112,7 +112,7 @@ export default function PersonalizationPage() {
     // Sedikit delay agar user lihat loading state
     await new Promise((r) => setTimeout(r, 500));
 
-    router.push('/onboarding/brain-dump');
+    router.push('/onboarding/input-method');
   }
 
   const containerVariants = {
@@ -319,7 +319,7 @@ export default function PersonalizationPage() {
                 loadingText="Menyimpan..."
                 className="w-full"
               >
-                🧠 Lanjut ke Brain Dump →
+                Lanjut Pilih Mode →
               </PTButton>
 
               <PTButton

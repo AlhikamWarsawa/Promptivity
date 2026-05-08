@@ -292,7 +292,9 @@ export default function DevPage() {
               hoverable
               accentColor={fw.accentColor}
             >
-              <div className="text-3xl mb-2">{fw.icon}</div>
+              <div className="mb-2">
+                {fw.icon && <fw.icon size={32} />}
+              </div>
               <CardTitle className="text-[1rem] leading-tight">{fw.shortName}</CardTitle>
               <SmallText className="mt-1 line-clamp-2">{fw.tagline}</SmallText>
               <div className="mt-3">

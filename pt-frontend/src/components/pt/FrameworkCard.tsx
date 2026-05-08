@@ -5,6 +5,7 @@ import { motion }        from 'framer-motion';
 import { cn }            from '@/lib/utils';
 import { ScoreBar }      from '@/components/pt/ScoreBar';
 import { getFramework }  from '@/lib/frameworkConfig';
+import PTStorage         from '@/lib/storage';
 import type { FrameworkOutput } from '@/types/pt.types';
 
 /* ============================================
@@ -29,6 +30,7 @@ export function FrameworkCard({
   className,
 }: FrameworkCardProps) {
   const meta   = getFramework(framework.frameworkId);
+  const FrameworkIcon = meta?.icon;
   const route  = meta?.route ?? `/frameworks/${framework.frameworkId}`;
 
   if (variant === 'feature') {
@@ -38,8 +40,13 @@ export function FrameworkCard({
   return (
     <Link href={route} className="block focus-visible:outline-2 focus-visible:outline-pt-blue rounded-sketch">
       <motion.div
-        whileHover={{ y: -3, transition: { duration: 0.15 } }}
-        whileTap={{ y: 0 }}
+        whileHover={{
+          y: -4,
+          scale: 1.02,
+          rotate: framework.frameworkId.length % 2 === 0 ? 1 : -1,
+          transition: { type: 'spring', stiffness: 300, damping: 20 },
+        }}
+        whileTap={{ y: 0, scale: 0.98 }}
         className={cn(
           'relative h-full flex flex-col gap-2',
           'p-3 rounded-sketch border-2 border-pt-black',
@@ -47,7 +54,7 @@ export function FrameworkCard({
           'transition-shadow duration-200',
           isTop
             ? 'shadow-sketch-lg ring-2 ring-pt-yellow'
-            : 'shadow-sketch hover:shadow-sketch-lg',
+            : 'shadow-sketch hover:shadow-[6px_6px_0px_#2B2B2B]',
           className,
         )}
         style={{
@@ -66,8 +73,8 @@ export function FrameworkCard({
         )}
 
         {/* Icon */}
-        <div className="text-2xl leading-none" aria-hidden="true">
-          {meta?.icon ?? '📋'}
+        <div className="shrink-0" aria-hidden="true">
+          {FrameworkIcon && <FrameworkIcon size={24} />}
         </div>
 
         {/* Name */}
@@ -143,11 +150,11 @@ function FeatureFrameworkCard({
       {/* Header */}
       <div className="flex items-center gap-4 mb-5 pr-24">
         <div
-          className="w-16 h-16 rounded-sketch border-2 border-pt-black flex items-center justify-center text-4xl shrink-0"
+          className="w-16 h-16 rounded-sketch border-2 border-pt-black flex items-center justify-center shrink-0"
           style={{ backgroundColor: 'white', boxShadow: '3px 3px 0px #2B2B2B' }}
           aria-hidden="true"
         >
-          {meta?.icon ?? '📋'}
+          {meta?.icon && <meta.icon size={40} />}
         </div>
         <div>
           <p
@@ -176,6 +183,7 @@ function FeatureFrameworkCard({
           >
             &ldquo;{meta?.tagline ?? ''}&rdquo;
           </p>
+          <PersonalizationBadge preferredStyle={PTStorage.getPersona()?.preferredStyle} />
         </div>
       </div>
 
@@ -230,5 +238,19 @@ function FeatureFrameworkCard({
         Buka {meta?.shortName ?? 'Framework'} →
       </Link>
     </motion.div>
+  );
+}
+
+function PersonalizationBadge({ preferredStyle }: { preferredStyle?: string }) {
+  if (!preferredStyle) return null;
+  
+  const text = preferredStyle === 'structured' 
+    ? 'Matches your structured working style' 
+    : 'Matches your flexible execution style';
+    
+  return (
+    <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/50 border border-pt-black/10 text-[10px] font-bold text-pt-brown uppercase tracking-wider">
+      ✨ {text}
+    </div>
   );
 }

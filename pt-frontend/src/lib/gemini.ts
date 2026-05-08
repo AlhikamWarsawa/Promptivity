@@ -1,10 +1,5 @@
-/* ============================================
-   Promptivity — Backend API Client
-   Updated Day 7: integrate with parseSession
-   ============================================ */
-
 import type { PTSession, Personalization } from '@/types/pt.types';
-import { parseSession, validateSession }    from '@/lib/parsers';
+import { parseSession, parseFrameworkOutput, validateSession } from '@/lib/parsers';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -19,11 +14,12 @@ export interface APIResult {
   error?:   string;
 }
 
-/**
- * Send story to Promptivity backend.
- * Parses and validates response before returning.
- * Never throws — always returns APIResult.
- */
+export interface FrameworkAPIResult {
+  success: boolean;
+  data?:   any;
+  error?:   string;
+}
+
 export async function processStoryAPI(
   input: ProcessStoryInput,
 ): Promise<APIResult> {
@@ -45,64 +41,54 @@ export async function processStoryAPI(
 
     if (!response.ok) {
       if (response.status === 429) {
-        return {
-          success: false,
-          error:   'Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.',
-        };
+        return { success: false, error: 'Terlalu banyak permintaan.' };
       }
       const errBody = await response.json().catch(() => ({}));
-      return {
-        success: false,
-        error:   (errBody as { detail?: string }).detail ?? `Server error: ${response.status}`,
-      };
+      return { success: false, error: (errBody as { detail?: string }).detail ?? `Server error: ${response.status}` };
     }
 
     const body = await response.json();
+    if (!body.success) return { success: false, error: body.error };
 
-    if (!body.success) {
-      return {
-        success: false,
-        error:   body.error ?? 'Moti gagal memproses ceritamu. Coba lagi.',
-      };
-    }
-
-    // Parse raw data → typed PTSession
     const session = parseSession(
       body.data,
       input.rawText,
       input.personalization as Personalization | undefined,
     );
 
-    // Validate (log issues but don't fail)
-    const { valid, issues } = validateSession(session);
-    if (!valid) {
-      console.warn('[Promptivity] Session validation issues:', issues);
-      // Still return session — parser already filled defaults
-    }
-
     return { success: true, session };
-
   } catch (error) {
     clearTimeout(timeoutId);
+    return { success: false, error: 'Terjadi kesalahan tidak terduga.' };
+  }
+}
 
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      return {
-        success: false,
-        error:   'Request timeout (90s). Gemini butuh waktu lebih lama dari biasanya. Coba lagi.',
-      };
+/**
+ * Generate specific framework data on demand.
+ */
+export async function generateFrameworkAPI(
+  sessionId:   string,
+  frameworkId: string,
+): Promise<FrameworkAPIResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/generate-framework`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ sessionId, frameworkId }),
+    });
+
+    if (!response.ok) {
+      return { success: false, error: `Server error: ${response.status}` };
     }
 
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      return {
-        success: false,
-        error:   'Tidak bisa terhubung ke server. Pastikan backend berjalan di port 8000.',
-      };
-    }
+    const body = await response.json();
+    if (!body.success) return { success: false, error: body.error };
 
-    console.error('[Promptivity] Unexpected API error:', error);
-    return {
-      success: false,
-      error:   'Terjadi kesalahan tidak terduga. Coba lagi.',
-    };
+    // Parse the framework-specific output using our existing parser logic
+    const fwOutput = parseFrameworkOutput(frameworkId as any, body.data);
+
+    return { success: true, data: fwOutput };
+  } catch (error) {
+    return { success: false, error: 'Koneksi ke server gagal.' };
   }
 }

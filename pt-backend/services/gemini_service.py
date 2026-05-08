@@ -2,18 +2,24 @@ import os
 import json
 import uuid
 import re
+import hashlib
+import logging
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 import google.generativeai as genai
-from services.prompts import SYSTEM_PROMPT, build_user_prompt
+from google.api_core import exceptions
 
-# ============================================
-# Promptivity — Gemini Service
-# Handles all Gemini API calls with proper
-# error handling and output validation.
-# ============================================
+# Setup logging
+QUOTA_LOG_FILE = "storage/logs/quota_errors.log"
+os.makedirs(os.path.dirname(QUOTA_LOG_FILE), exist_ok=True)
+logging.basicConfig(level=logging.INFO)
+quota_logger = logging.getLogger("gemini_quota")
+fh = logging.FileHandler(QUOTA_LOG_FILE)
+fh.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+quota_logger.addHandler(fh)
 
-# Safety settings — relax untuk productivity content
+# Safety settings
 SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_HARASSMENT",        "threshold": "BLOCK_ONLY_HIGH"},
     {"category": "HARM_CATEGORY_HATE_SPEECH",       "threshold": "BLOCK_ONLY_HIGH"},
@@ -22,12 +28,12 @@ SAFETY_SETTINGS = [
 ]
 
 GENERATION_CONFIG = {
-    "temperature":       0.4,    # Lower = more consistent JSON output
+    "temperature":       0.4,
     "top_p":             0.95,
     "top_k":             40,
-    "max_output_tokens": 8192,   # 13 frameworks butuh banyak token
+    "max_output_tokens": 8192,
+    "response_mime_type": "application/json",
 }
-
 
 class GeminiService:
     def __init__(self):
@@ -36,162 +42,89 @@ class GeminiService:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(
-            model_name     = "gemini-1.5-flash",   # Fast + cost-effective untuk MVP
-            system_instruction = SYSTEM_PROMPT,
-            safety_settings    = SAFETY_SETTINGS,
-            generation_config  = GENERATION_CONFIG,
-        )
+        self.storage_dir = "storage/stories"
+        self.cache_dir   = "storage/cache"
+        self.framework_cache_dir = "storage/frameworks"
+        os.makedirs(self.storage_dir, exist_ok=True)
+        os.makedirs(self.cache_dir, exist_ok=True)
+        os.makedirs(self.framework_cache_dir, exist_ok=True)
 
-    async def process_story(
+    def _get_story_hash(self, story: str, personalization: Optional[dict]) -> str:
+        data = {"story": story, "personalization": personalization}
+        return hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
+    def _save_story(self, session_id: str, story: str, personalization: Optional[dict]):
+        path = os.path.join(self.storage_dir, f"{session_id}.json")
+        with open(path, "w") as f:
+            json.dump({"story": story, "personalization": personalization}, f)
+
+    def _load_story(self, session_id: str) -> dict:
+        path = os.path.join(self.storage_dir, f"{session_id}.json")
+        if not os.path.exists(path):
+            raise ValueError("Session not found")
+        with open(path, "r") as f:
+            return json.load(f)
+
+    def _get_cached_session(self, story_hash: str) -> Optional[dict]:
+        path = os.path.join(self.cache_dir, f"{story_hash}.json")
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return json.load(f)
+        return None
+
+    def _cache_session(self, story_hash: str, session: dict):
+        path = os.path.join(self.cache_dir, f"{story_hash}.json")
+        with open(path, "w") as f:
+            json.dump(session, f)
+
+    def _get_cached_framework(self, session_id: str, framework_id: str) -> Optional[dict]:
+        path = os.path.join(self.framework_cache_dir, f"{session_id}_{framework_id}.json")
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return json.load(f)
+        return None
+
+    def _cache_framework(self, session_id: str, framework_id: str, data: dict):
+        path = os.path.join(self.framework_cache_dir, f"{session_id}_{framework_id}.json")
+        with open(path, "w") as f:
+            json.dump(data, f)
+
+    async def process_story_initial(
         self,
         story:           str,
         personalization: Optional[dict] = None,
     ) -> dict:
-        """
-        Send user story to Gemini and return parsed PTSession dict.
-        
-        Returns:
-            Parsed PTSession dict (ready to be returned as API response)
-        
-        Raises:
-            ValueError: If story is too short
-            RuntimeError: If Gemini fails after retries
-        """
-        if len(story.strip().split()) < 10:
-            raise ValueError("Story is too short. Please provide more context.")
+        """Initial story analysis for the dashboard."""
+        story_hash = self._get_story_hash(story, personalization)
+        cached = self._get_cached_session(story_hash)
+        if cached:
+            return cached
 
+        from services.prompts import DASHBOARD_SYSTEM_PROMPT, build_user_prompt
         user_prompt = build_user_prompt(story, personalization)
         
-        # Retry logic: 2 attempts
-        last_error = None
-        for attempt in range(2):
-            try:
-                response = await self._call_gemini(user_prompt)
-                raw_json  = self._extract_json(response)
-                parsed    = self._parse_and_validate(raw_json)
-                session   = self._build_session(parsed, story, personalization)
-                return session
-
-            except json.JSONDecodeError as e:
-                last_error = f"JSON parsing failed: {str(e)}"
-                print(f"[GeminiService] Attempt {attempt+1} JSON error: {last_error}")
-                continue
-            except Exception as e:
-                last_error = str(e)
-                print(f"[GeminiService] Attempt {attempt+1} error: {last_error}")
-                if attempt == 0:
-                    continue
-                break
-
-        raise RuntimeError(f"Gemini processing failed after 2 attempts: {last_error}")
-
-    async def _call_gemini(self, prompt: str) -> str:
-        """Make the actual API call. Returns raw text response."""
-        try:
-            # Note: google-generativeai tidak native async,
-            # tapi ini cukup untuk MVP. Day 22 bisa switch ke asyncio.to_thread
-            response = self.model.generate_content(prompt)
-            
-            if not response.text:
-                raise RuntimeError("Gemini returned empty response")
-            
-            return response.text
-
-        except Exception as e:
-            error_msg = str(e)
-            if "429" in error_msg or "quota" in error_msg.lower():
-                raise RuntimeError("API rate limit reached. Please wait a moment and try again.")
-            elif "timeout" in error_msg.lower():
-                raise RuntimeError("Request timed out. Please try again.")
-            else:
-                raise RuntimeError(f"Gemini API error: {error_msg}")
-
-    def _extract_json(self, raw_text: str) -> str:
-        """
-        Extract JSON from Gemini response.
-        Handles cases where Gemini wraps output in markdown code blocks.
-        """
-        text = raw_text.strip()
+        response_text = await self._call_gemini(
+            system_instruction=DASHBOARD_SYSTEM_PROMPT,
+            prompt=user_prompt
+        )
+        parsed = self._parse_and_validate_dashboard(self._extract_json(response_text))
         
-        # Remove markdown code blocks if present
-        if text.startswith("```"):
-            # Remove ```json or ``` at start
-            text = re.sub(r'^```(?:json)?\n?', '', text)
-            # Remove ``` at end
-            text = re.sub(r'\n?```$', '', text)
-            text = text.strip()
-        
-        # Find first { and last }
-        start = text.find('{')
-        end   = text.rfind('}')
-        
-        if start == -1 or end == -1:
-            raise json.JSONDecodeError("No JSON object found in response", text, 0)
-        
-        return text[start:end+1]
-
-    def _parse_and_validate(self, json_str: str) -> dict:
-        """Parse JSON and validate required top-level keys."""
-        data = json.loads(json_str)
-        
-        required_keys = [
-            "topRecommendation",
-            "topRecommendationReason",
-            "masterTaskList",
-            "todayPlan",
-            "frameworks",
-        ]
-        
-        for key in required_keys:
-            if key not in data:
-                # Don't fail — fill with defaults
-                print(f"[GeminiService] Warning: missing key '{key}', using default")
-                data[key] = self._get_default(key)
-        
-        # Ensure all 13 frameworks present
-        required_frameworks = [
-            "gtd", "kanban", "time-blocking", "eat-the-frog", "pomodoro",
-            "eisenhower", "systemist", "medium-method", "okrs",
-            "weekly-review", "commitment-inventory", "smart-goals", "para",
-        ]
-        
-        if "frameworks" not in data or not isinstance(data["frameworks"], dict):
-            data["frameworks"] = {}
-        
-        for fw in required_frameworks:
-            if fw not in data["frameworks"]:
-                print(f"[GeminiService] Warning: framework '{fw}' missing, using skeleton")
-                data["frameworks"][fw] = self._get_framework_skeleton(fw)
-        
-        return data
-
-    def _build_session(
-        self,
-        parsed:          dict,
-        story:           str,
-        personalization: Optional[dict],
-    ) -> dict:
-        """Convert parsed Gemini output to PTSession format."""
         session_id = str(uuid.uuid4())
+        self._save_story(session_id, story, personalization)
         
-        # Build framework output list
         frameworks_list = []
-        for fw_id, fw_data in parsed.get("frameworks", {}).items():
-            fw_output = {
-                "frameworkId":          fw_id,
-                "isRecommended":        fw_data.get("isRecommended", False),
-                "recommendationScore":  fw_data.get("recommendationScore", 50),
-                "recommendationReason": fw_data.get("recommendationReason", ""),
-                "tasks":                fw_data.get("nextActions", fw_data.get("backlog", [])),
-                "todayActions":         fw_data.get("todayActions", []),
-                "rawData":              {k: v for k, v in fw_data.items()
-                                        if k not in ("isRecommended", "recommendationScore",
-                                                     "recommendationReason", "todayActions")},
-            }
-            frameworks_list.append(fw_output)
-        
-        return {
+        for fw in parsed.get("frameworks", []):
+            frameworks_list.append({
+                "frameworkId":          fw["id"],
+                "recommendationScore":  fw["score"],
+                "recommendationReason": fw["reason"],
+                "isRecommended":        fw["score"] >= 75,
+                "tasks":                [],
+                "todayActions":         [],
+                "rawData":              {},
+            })
+
+        session = {
             "sessionId":               session_id,
             "processedAt":             datetime.now(timezone.utc).isoformat(),
             "story": {
@@ -206,27 +139,145 @@ class GeminiService:
             "frameworks":              frameworks_list,
             "isDemo":                  False,
         }
+        
+        self._cache_session(story_hash, session)
+        return session
 
-    def _get_default(self, key: str):
-        defaults = {
-            "topRecommendation":       "gtd",
-            "topRecommendationReason": "GTD is a solid starting point for organizing your tasks.",
-            "masterTaskList":          [],
-            "todayPlan":               ["Review your current tasks and pick the most important one"],
+    async def generate_framework(self, session_id: str, framework_id: str) -> dict:
+        """Generate specific framework data on demand."""
+        cached = self._get_cached_framework(session_id, framework_id)
+        if cached:
+            return cached
+
+        from services.prompts import FRAMEWORK_SYSTEM_PROMPT, build_framework_prompt
+        story_data = self._load_story(session_id)
+        user_prompt = build_framework_prompt(
+            story_data["story"], 
+            framework_id, 
+            story_data["personalization"]
+        )
+        
+        system_instruction = FRAMEWORK_SYSTEM_PROMPT.replace("{framework_id}", framework_id)
+        
+        response_text = await self._call_gemini(
+            system_instruction=system_instruction,
+            prompt=user_prompt
+        )
+        parsed = self._extract_json(response_text)
+        data = json.loads(parsed)
+        
+        result = {
+            "frameworkId":  framework_id,
+            "rawData":      data.get("data", {}),
+            "todayActions": data.get("todayActions", []),
+            "tasks":        [], 
         }
-        return defaults.get(key, None)
+        
+        self._cache_framework(session_id, framework_id, result)
+        return result
 
-    def _get_framework_skeleton(self, fw_id: str) -> dict:
-        """Return a minimal skeleton for a missing framework."""
-        return {
-            "recommendationScore":  50,
-            "recommendationReason": "Could not extract enough data for this framework.",
-            "isRecommended":        False,
-            "todayActions":         ["Review your tasks and apply this framework"],
-        }
+    def _parse_and_validate_dashboard(self, json_str: str) -> dict:
+        data = json.loads(json_str)
+        if "frameworks" not in data: data["frameworks"] = []
+        if "masterTaskList" not in data: data["masterTaskList"] = []
+        return data
 
+    def _extract_json(self, raw_text: str) -> str:
+        text = raw_text.strip().lstrip('\ufeff')
+        text = re.sub(r'^```(?:json|JSON)?\s*\n?', '', text, flags=re.MULTILINE)
+        text = re.sub(r'\n?```\s*$', '', text, flags=re.MULTILINE)
+        text = text.strip()
+        start = text.find('{')
+        if start == -1: return "{}"
+        depth = 0
+        in_str = False
+        escape = False
+        end = -1
+        for i, ch in enumerate(text[start:], start):
+            if escape: escape = False; continue
+            if ch == '\\' and in_str: escape = True; continue
+            if ch == '"': in_str = not in_str; continue
+            if in_str: continue
+            if ch == '{': depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0: end = i; break
+        return text[start:end+1] if end != -1 else text[start:]
 
-# Singleton instance
+    async def _call_gemini(self, system_instruction: str, prompt: str, retry_count=0) -> str:
+        model = genai.GenerativeModel(
+            model_name="gemini-3.1-flash-lite",
+            system_instruction=system_instruction,
+            generation_config=GENERATION_CONFIG,
+            safety_settings=SAFETY_SETTINGS
+        )
+        try:
+            response = model.generate_content(
+                contents=[{"role": "user", "parts": [{"text": prompt}]}]
+            )
+            if not response.text:
+                raise RuntimeError("Empty response from Gemini")
+            return response.text
+        except exceptions.ResourceExhausted as e:
+            quota_logger.warning(f"Quota exceeded (429) for prompt: {prompt[:50]}... Error: {e}")
+            if retry_count < 2:
+                wait_time = (retry_count + 1) * 2
+                await asyncio.sleep(wait_time)
+                return await self._call_gemini(system_instruction, prompt, retry_count + 1)
+            raise RuntimeError("AI quota temporarily exhausted. Please retry in 1 minute.")
+        except Exception as e:
+            if "429" in str(e) or "quota" in str(e).lower():
+                quota_logger.warning(f"Potential quota error detected: {e}")
+                if retry_count < 2:
+                    await asyncio.sleep(2)
+                    return await self._call_gemini(system_instruction, prompt, retry_count + 1)
+                raise RuntimeError("AI quota temporarily exhausted. Please retry in 1 minute.")
+            raise RuntimeError(f"Gemini error: {e}")
+
+    async def confused_chat(self, message: str, history: list[dict]) -> dict:
+        from services.prompts import CONFUSED_MODE_SYSTEM_PROMPT
+        
+        model = genai.GenerativeModel(
+            model_name="gemini-3.1-flash-lite",
+            system_instruction=CONFUSED_MODE_SYSTEM_PROMPT,
+            generation_config={"temperature": 0.7, "top_p": 0.95, "max_output_tokens": 8192},
+            safety_settings=SAFETY_SETTINGS
+        )
+        
+        formatted_history = []
+        for h in history:
+            role = "user" if h["role"] == "user" else "model"
+            # Extract content from list if necessary
+            content_text = h["content"]
+            if isinstance(content_text, list):
+                content_text = " ".join([p.get("text", "") for p in content_text])
+            formatted_history.append({"role": role, "parts": [content_text]})
+            
+        chat = model.start_chat(history=formatted_history)
+        
+        try:
+            response = chat.send_message(message)
+            if not response.text:
+                raise RuntimeError("Empty response from Gemini")
+            return {"reply": response.text}
+        except Exception as e:
+            raise RuntimeError(f"Gemini error in confused mode: {e}")
+
+    async def finish_confused_session(self, conversation_history: list[dict]) -> dict:
+        from services.prompts import CONFUSED_SUMMARY_SYSTEM_PROMPT
+        
+        chat_text = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in conversation_history])
+        user_prompt = f"Here is the conversation:\n\n{chat_text}\n\nPlease summarize this into a concise productivity story format suitable for mission building."
+        
+        response_text = await self._call_gemini(
+            system_instruction=CONFUSED_SUMMARY_SYSTEM_PROMPT,
+            prompt=user_prompt
+        )
+        parsed = self._extract_json(response_text)
+        data = json.loads(parsed)
+        return data
+
+# Singleton
 _gemini_service: Optional[GeminiService] = None
 
 def get_gemini_service() -> GeminiService:

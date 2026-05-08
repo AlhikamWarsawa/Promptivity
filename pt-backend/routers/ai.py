@@ -34,75 +34,75 @@ def check_rate_limit(ip: str) -> bool:
 
 @router.post("/process-story", response_model=ProcessStoryResponse)
 async def process_story(request: Request, body: ProcessStoryRequest):
-    """
-    Process user story through Gemini and return mission plan.
-    
-    Request:
-        story:           str   — User's free-form story text
-        personalization: dict  — Optional personalization data
-    
-    Response:
-        success: bool
-        data:    PTSession | None
-        error:   str | None
-    """
-    # Rate limit check
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(client_ip):
-        raise HTTPException(
-            status_code=429,
-            detail="Too many requests. Please wait a minute before trying again."
-        )
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
     
-    # Validate story length
     story = body.story.strip()
-    if not story:
-        return ProcessStoryResponse(
-            success=False,
-            error="Story cannot be empty."
-        )
+    if not story: return ProcessStoryResponse(success=False, error="Empty story")
     
-    if len(story.split()) < 5:
-        return ProcessStoryResponse(
-            success=False,
-            error="Story is too short. Please provide more context about your situation."
-        )
+    personalization = body.personalization.model_dump() if body.personalization else None
     
-    # Sanitize: strip HTML tags (basic)
-    import re
-    story_clean = re.sub(r'<[^>]+>', '', story)
-    
-    # Personalization data
-    personalization = None
-    if body.personalization:
-        personalization = body.personalization.model_dump()
-    
-    # Process via Gemini
     try:
         gemini = get_gemini_service()
-        session = await gemini.process_story(story_clean, personalization)
-        
-        return ProcessStoryResponse(
-            success=True,
-            data=session,
-        )
-
-    except ValueError as e:
-        # User input error
-        return ProcessStoryResponse(
-            success=False,
-            error=str(e)
-        )
-    except RuntimeError as e:
-        # AI processing error
-        return ProcessStoryResponse(
-            success=False,
-            error=f"Mission building failed: {str(e)}"
-        )
+        session = await gemini.process_story_initial(story, personalization)
+        return ProcessStoryResponse(success=True, data=session)
     except Exception as e:
-        # Unexpected error
-        print(f"[/api/process-story] Unexpected error: {e}")
-        return ProcessStoryResponse(
-            success=False,
-            error="An unexpected error occurred. Please try again."
-        )
+        return ProcessStoryResponse(success=False, error=str(e))
+
+@router.post("/generate-framework")
+async def generate_framework(request: Request, body: dict):
+    """
+    Request:
+        sessionId:   str
+        frameworkId: str
+    """
+    session_id   = body.get("sessionId")
+    framework_id = body.get("frameworkId")
+    
+    if not session_id or not framework_id:
+        raise HTTPException(status_code=400, detail="Missing sessionId or frameworkId")
+        
+    try:
+        gemini = get_gemini_service()
+        data = await gemini.generate_framework(session_id, framework_id)
+        return {"success": True, "data": data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@router.post("/confused-chat")
+async def confused_chat(request: Request, body: dict):
+    """
+    Request:
+        message: str
+        history: list[dict]
+    """
+    message = body.get("message")
+    history = body.get("history", [])
+    
+    if not message:
+        raise HTTPException(status_code=400, detail="Missing message")
+        
+    try:
+        gemini = get_gemini_service()
+        data = await gemini.confused_chat(message, history)
+        return {"success": True, "reply": data.get("reply")}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@router.post("/finish-confused-session")
+async def finish_confused_session(request: Request, body: dict):
+    """
+    Request:
+        history: list[dict]
+    """
+    history = body.get("history", [])
+    if not history:
+        raise HTTPException(status_code=400, detail="Missing history")
+        
+    try:
+        gemini = get_gemini_service()
+        data = await gemini.finish_confused_session(history)
+        return {"success": True, "story": data.get("story")}
+    except Exception as e:
+        return {"success": False, "error": str(e)}

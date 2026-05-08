@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePTStore } from '@/store/usePTStore';
@@ -13,6 +14,7 @@ import { PTButton } from '@/components/pt/PTButton';
 import { PriorityBadge } from '@/components/pt/PTBadge';
 import { getFramework, FRAMEWORK_LIST } from '@/lib/frameworkConfig';
 import PTStorage from '@/lib/storage';
+import { MotiMascot, PTLogo } from '@/components/pt/icons';
 import type { Task, FrameworkId } from '@/types/pt.types';
 
 /* ============================================
@@ -96,6 +98,9 @@ export default function DashboardPage() {
   const firstName = persona?.name && persona.name !== 'Friend'
     ? persona.name.split(' ')[0]
     : null;
+  const userRole = persona?.role && persona.role !== 'lainnya'
+    ? persona.role
+    : null;
 
   const completedCount = session.masterTaskList.filter((t) => t.isCompleted).length;
   const totalCount = session.masterTaskList.length;
@@ -109,7 +114,7 @@ export default function DashboardPage() {
       <DashboardNav userName={persona?.name} />
 
       {/* Hero section */}
-      <HeroSection firstName={firstName} />
+      <HeroSection firstName={firstName} role={userRole} />
 
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
@@ -126,7 +131,6 @@ export default function DashboardPage() {
                 transition={{ duration: 0.5, delay: 0.1 }}
                 aria-label="Top recommended framework"
               >
-                {/* <SectionLabel icon="🏆" label="Framework Terpilih untuk Kamu" /> */}
                 <FrameworkCard
                   framework={topFramework}
                   isTop={true}
@@ -150,7 +154,7 @@ export default function DashboardPage() {
             >
               <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <SectionLabel
-                  icon="📋"
+                  icon={<PTLogo size={24} />}
                   label={`Semua Task (${completedCount}/${totalCount} selesai)`}
                 />
 
@@ -233,7 +237,7 @@ export default function DashboardPage() {
               aria-label="All 13 frameworks"
             >
               <HandDrawnDivider variant="wave" color="var(--pt-black)" className="opacity-20 mb-6" />
-              <SectionLabel icon="🗂️" label="Semua 13 Framework" />
+              <SectionLabel icon={<PTLogo size={24} />} label="Semua 13 Framework" />
               <p
                 className="text-sm mt-1 mb-4"
                 style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
@@ -251,7 +255,7 @@ export default function DashboardPage() {
                   >
                     <FrameworkCard
                       framework={fw}
-                      isTop={fw.frameworkId === session.topRecommendation}
+                      isTop={fw.frameworkId === topFramework?.frameworkId}
                       variant="grid"
                     />
                   </motion.div>
@@ -287,13 +291,15 @@ export default function DashboardPage() {
             <div className="sticky top-24 space-y-4">
               <TodayPlanPanel actions={session.todayPlan} />
 
-              {/* Quick stats */}
               <QuickStats
                 totalTasks={totalCount}
                 completedTasks={completedCount}
                 topFramework={session.topRecommendation}
                 processedAt={session.processedAt}
               />
+
+              {/* Journal CTA */}
+              <JournalCTA />
             </div>
           </div>
 
@@ -309,7 +315,7 @@ export default function DashboardPage() {
 
 /* ---- Hero Section ---- */
 
-function HeroSection({ firstName }: { firstName: string | null }) {
+function HeroSection({ firstName, role }: { firstName: string | null; role: string | null }) {
   return (
     <motion.section
       initial={{ opacity: 0, y: -10 }}
@@ -329,14 +335,14 @@ function HeroSection({ firstName }: { firstName: string | null }) {
             }}
           >
             {firstName
-              ? `Mission siap, ${firstName}! 🎯`
+              ? `Welcome back, ${firstName}! 🎯`
               : 'Your Mission is Ready! 🎯'}
           </h1>
           <p
-            className="mt-1.5 text-sm"
+            className="mt-1.5 text-sm font-bold uppercase tracking-wide"
             style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-brown)' }}
           >
-            Moti sudah menganalisis ceritamu dan membangun 13 framework productivity untukmu.
+            {role ? `${role} mode activated` : 'Moti has analyzed your story and built 13 framework productivity for you.'}
           </p>
         </div>
 
@@ -344,10 +350,10 @@ function HeroSection({ firstName }: { firstName: string | null }) {
         <motion.div
           animate={{ rotate: [0, 5, -5, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          className="shrink-0 text-5xl"
+          className="shrink-0"
           aria-label="Moti, maskot Promptivity"
         >
-          🧠
+          <MotiMascot size={80} />
         </motion.div>
       </div>
     </motion.section>
@@ -356,7 +362,7 @@ function HeroSection({ firstName }: { firstName: string | null }) {
 
 /* ---- Section Label ---- */
 
-function SectionLabel({ icon, label }: { icon: string; label: string }) {
+function SectionLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-xl" aria-hidden="true">{icon}</span>
@@ -493,6 +499,56 @@ function EmptyState({ message }: { message: string }) {
       <p className="text-4xl mb-3" aria-hidden="true">🎉</p>
       <p style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}>{message}</p>
     </div>
+  );
+}
+
+/* ---- Journal CTA ---- */
+
+function JournalCTA() {
+  return (
+    <Link href="/journal" className="block group">
+      <motion.div
+        whileHover={{ 
+          y: -6, 
+          rotate: -1,
+          transition: { type: 'spring', stiffness: 400, damping: 15 } 
+        }}
+        whileTap={{ scale: 0.95, rotate: 1 }}
+        initial={{ rotate: 1 }}
+        className="p-5 rounded-sketch border-[3px] border-pt-black shadow-sketch-lg hover:shadow-sketch-xl bg-[#E0F2FE] transition-all relative overflow-hidden"
+      >
+        {/* Cartoonish accent */}
+        <div className="absolute -top-2 -right-2 w-12 h-12 bg-pt-yellow rounded-full border-2 border-pt-black flex items-center justify-center -rotate-12 shadow-sm">
+          <span className="text-xl">✨</span>
+        </div>
+
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-full bg-white border-2 border-pt-black flex items-center justify-center shadow-sm">
+            <span className="text-xl" aria-hidden="true">📖</span>
+          </div>
+          <h3 className="font-display text-xl text-pt-black group-hover:text-pt-blue transition-colors leading-none mt-1">
+            Productivity Journal
+          </h3>
+        </div>
+        
+        <p className="text-sm text-pt-brown leading-tight mt-3 mb-1" style={{ fontFamily: 'var(--font-body)' }}>
+          Review your past sessions & history.
+        </p>
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex -space-x-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="w-6 h-6 rounded-full border-2 border-pt-black bg-white flex items-center justify-center text-[10px]">
+                {['🎯', '✅', '🔥'][i-1]}
+              </div>
+            ))}
+          </div>
+          <span className="text-xs font-bold uppercase tracking-wider bg-pt-black text-white px-3 py-1 rounded-sketch translate-x-2 rotate-2 group-hover:rotate-0 transition-transform">
+            Open →
+          </span>
+        </div>
+      </motion.div>
+    </Link>
   );
 }
 

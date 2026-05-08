@@ -14,7 +14,7 @@ import { ProgressSteps, PT_ONBOARDING_STEPS } from './ProgressSteps';
    ============================================ */
 
 interface OnboardingTopBarProps {
-  currentStep: 1 | 2 | 3;
+  currentStep: 1 | 2 | 3 | 4;
 }
 
 export function OnboardingTopBar({ currentStep }: OnboardingTopBarProps) {

@@ -31,6 +31,8 @@ export interface PTStoreState {
     personalization?: Partial<Personalization>,
   ) => Promise<{ success: boolean; error?: string }>;
 
+  generateFramework: (frameworkId: string) => Promise<{ success: boolean; error?: string }>;
+
   loadFromStorage:    () => void;
   setSession:         (session: PTSession) => void;
   clearSession:       () => void;
@@ -39,6 +41,13 @@ export interface PTStoreState {
   moveKanbanCard:     (taskId: string, toColumn: 'backlog' | 'inProgress' | 'done') => void;
   updateKRProgress:   (krIndex: number, progress: number) => void;
   updateGoalProgress: (goalIndex: number, progress: number) => void;
+
+  // Confused Mode
+  confusedMessages:   { role: 'user' | 'model'; content: string }[];
+  addConfusedMessage: (role: 'user' | 'model', content: string) => void;
+  addGreetingMessage: () => void;
+  resetConfusedMessages:  () => void;
+  clearConfusedSession: () => void;
 }
 
 /* ---- Store Implementation ---- */
@@ -51,6 +60,7 @@ export const usePTStore = create<PTStoreState>()(
     isLoading:        false,
     error:            null,
     loadedFromStorage:false,
+    confusedMessages: [],
 
     // ---- Actions ----
 
@@ -59,13 +69,19 @@ export const usePTStore = create<PTStoreState>()(
      * Handles loading state, error state, and auto-save.
      */
     processStory: async (storyText, personalization) => {
+      const { isLoading } = get();
+      if (isLoading) return { success: false };
+
       // Clear previous error
       set({ isLoading: true, error: null });
+
+      // Get personalization from storage if not provided
+      const finalPersonalization = personalization ?? PTStorage.getPersonaOrDefault();
 
       try {
         const result = await processStoryAPI({
           rawText:         storyText,
-          personalization: personalization,
+          personalization: finalPersonalization,
         });
 
         if (!result.success || !result.session) {
@@ -83,6 +99,10 @@ export const usePTStore = create<PTStoreState>()(
 
         // Auto-save (triggered by subscriber below, but also explicit here)
         PTStorage.saveSession(result.session);
+        
+        // Save to Journal
+        const localDate = new Date().toLocaleDateString('en-CA');
+        PTStorage.saveSessionByDate(localDate, result.session);
 
         return { success: true };
 
@@ -96,15 +116,59 @@ export const usePTStore = create<PTStoreState>()(
     },
 
     /**
+     * Generate data for a specific framework on demand.
+     */
+    generateFramework: async (frameworkId) => {
+      const { session, isLoading } = get();
+      if (!session || isLoading) return { success: false, error: 'No active session or already loading' };
+
+      // Check if already generated
+      const fw = session.frameworks.find(f => f.frameworkId === frameworkId);
+      if (fw && fw.rawData && Object.keys(fw.rawData).length > 0) {
+        return { success: true };
+      }
+
+      set({ isLoading: true, error: null });
+
+      try {
+        const { generateFrameworkAPI } = await import('@/lib/gemini');
+        const result = await generateFrameworkAPI(session.sessionId, frameworkId as any);
+
+        if (!result.success || !result.data) {
+          const errMsg = result.error ?? `Moti gagal membangun framework ${frameworkId}.`;
+          set({ isLoading: false, error: errMsg });
+          return { success: false, error: errMsg };
+        }
+
+        // Update framework in session
+        const updatedFrameworks = session.frameworks.map(f => 
+          f.frameworkId === frameworkId ? result.data : f
+        );
+
+        const updatedSession = { ...session, frameworks: updatedFrameworks };
+        set({ session: updatedSession, isLoading: false });
+
+        return { success: true };
+      } catch (err) {
+        const errMsg = 'Terjadi kesalahan saat membangun framework.';
+        set({ isLoading: false, error: errMsg });
+        return { success: false, error: errMsg };
+      }
+    },
+
+    /**
      * Load existing session from localStorage.
      * Called on app init / page mount.
      */
     loadFromStorage: () => {
       if (get().loadedFromStorage) return;   // Jangan load dua kali
 
-      const stored = PTStorage.getSession();
+      const storedSession = PTStorage.getSession();
+      const storedConfused = PTStorage.getConfusedMessages();
+
       set({
-        session:          stored,
+        session:          storedSession,
+        confusedMessages: storedConfused,
         loadedFromStorage: true,
       });
     },
@@ -269,21 +333,46 @@ export const usePTStore = create<PTStoreState>()(
 
       set({ session: { ...session, frameworks: updatedFrameworks } });
     },
+
+    // ---- Confused Mode Actions ----
+    addConfusedMessage: (role, content) => {
+      set((state) => ({
+        confusedMessages: [...state.confusedMessages, { role, content }],
+      }));
+    },
+    addGreetingMessage: () => {
+      const { confusedMessages } = get();
+      if (confusedMessages.length === 0) {
+        set({
+          confusedMessages: [{
+            role: 'model',
+            content: 'Halo! Aku Moti. Kamu lagi merasa stuck, bingung, atau kewalahan ya? Coba ceritain pelan-pelan ke aku, apa yang paling bikin pusing sekarang?'
+          }]
+        });
+      }
+    },
+    resetConfusedMessages: () => {
+      set({ confusedMessages: [] });
+      PTStorage.clearConfusedMessages();
+    },
+    clearConfusedSession: () => {
+      set({ confusedMessages: [] });
+    },
   })),
 );
 
-/* ---- Auto-save Subscriber ----
-   Setiap kali session berubah di store,
-   otomatis save ke localStorage.
-   Ini sebagai safety net di luar explicit save di processStory.
-*/
+// Middleware untuk auto-save session dan confusedMessages ke localStorage setiap berubah
 usePTStore.subscribe(
-  (state) => state.session,
-  (session) => {
-    if (session) {
-      PTStorage.saveSession(session);
+  (state) => ({ session: state.session, confusedMessages: state.confusedMessages }),
+  (current) => {
+    if (current.session) {
+      PTStorage.saveSession(current.session);
+    } else {
+      PTStorage.clearSession();
     }
+    PTStorage.saveConfusedMessages(current.confusedMessages);
   },
+  { equalityFn: (a, b) => a.session === b.session && a.confusedMessages === b.confusedMessages }
 );
 
 /* ---- Selectors (untuk cleaner component code) ---- */

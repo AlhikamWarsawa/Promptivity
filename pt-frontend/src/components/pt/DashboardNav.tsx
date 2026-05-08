@@ -1,10 +1,13 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link             from 'next/link';
 import { useRouter }    from 'next/navigation';
 import { motion }       from 'framer-motion';
 import { PTButton }     from '@/components/pt/PTButton';
 import { usePTStore }   from '@/store/usePTStore';
+import PTStorage         from '@/lib/storage';
+import { PTLogo }     from './icons';
 
 /* ============================================
    DashboardNav — Top navigation for dashboard
@@ -19,13 +22,25 @@ interface DashboardNavProps {
   userName?: string;
 }
 
-export function DashboardNav({ userName }: DashboardNavProps) {
+export function DashboardNav({ userName: propName }: DashboardNavProps) {
   const router       = useRouter();
   const clearSession = usePTStore((s) => s.clearSession);
+  const resetConfusedMessages = usePTStore((s) => s.resetConfusedMessages);
+
+  // Fetch name from storage if not provided as prop
+  const [userName, setUserName] = useState<string | undefined>(propName);
+
+  useEffect(() => {
+    if (!userName) {
+      const persona = PTStorage.getPersona();
+      if (persona?.name) setUserName(persona.name);
+    }
+  }, [userName]);
 
   function handleNewStory() {
     clearSession();
-    router.push('/onboarding/brain-dump');
+    resetConfusedMessages();
+    router.push('/onboarding/input-method');
   }
 
   return (
@@ -47,12 +62,7 @@ export function DashboardNav({ userName }: DashboardNavProps) {
         href="/"
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
-        <div
-          className="w-8 h-8 rounded-sketch border-2 border-pt-black flex items-center justify-center font-bold text-sm"
-          style={{ backgroundColor: 'var(--pt-yellow)', fontFamily: 'var(--font-display)' }}
-        >
-          P
-        </div>
+        <PTLogo size={32} />
         <span
           className="font-bold text-lg hidden sm:inline"
           style={{ fontFamily: 'var(--font-display)', color: 'var(--pt-black)' }}

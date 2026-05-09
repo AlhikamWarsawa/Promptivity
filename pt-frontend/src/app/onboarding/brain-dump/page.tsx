@@ -73,7 +73,8 @@ export default function BrainDumpPage() {
 
   // Word count
   const wordCount = story.trim().split(/\s+/).filter(Boolean).length;
-  const isReady   = wordCount >= MIN_WORDS;
+  const isTooShort = wordCount < 20;
+  const isReady    = wordCount >= MIN_WORDS;
 
   // Auto-save story draft (debounced)
   const handleStoryChange = useCallback(
@@ -123,7 +124,7 @@ export default function BrainDumpPage() {
 
   // Submit: trigger real AI processing
   async function handleBuildMission() {
-    if (isLoading) return;
+    if (isLoading || isTooShort) return;
 
     if (!isReady) {
       setShowNudgeModal(true);
@@ -166,6 +167,8 @@ export default function BrainDumpPage() {
       <ProcessingOverlay
         isVisible={isLoading}
         messages={PT_PROCESSING_MESSAGES}
+        onRetry={handleBuildMission}
+        onBack={() => window.location.reload()}
         onComplete={() => {
           // onComplete tidak dipakai lagi untuk redirect
           // redirect di-handle oleh useEffect di atas
@@ -192,38 +195,38 @@ export default function BrainDumpPage() {
         <div className="max-w-6xl mx-auto">
           <PersonaGreeting greetName={greetName} />
 
-          <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+          <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 items-start">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] as const }}
-              className="flex flex-col gap-5"
+              className="flex flex-col gap-6 order-1"
             >
               <MainPromptDisplay />
               <PromptStarters onSelect={applyStarter} />
 
               {/* Textarea */}
               <div
-                className="rounded-sketch border-2 border-pt-black overflow-hidden"
+                className="rounded-sketch border-[3px] border-pt-black overflow-hidden"
                 style={{
                   backgroundColor: 'var(--pt-white)',
-                  boxShadow: '4px 4px 0px #2B2B2B',
+                  boxShadow: '6px 6px 0px #2B2B2B',
                 }}
               >
                 <div
-                  className="flex items-center gap-2 px-4 py-2 border-b-2 border-pt-black"
+                  className="flex items-center gap-2 px-4 py-3 border-b-2 border-pt-black"
                   style={{ backgroundColor: 'var(--pt-yellowP)' }}
                 >
                   {['var(--pt-coral)', 'var(--pt-mustard)', 'var(--pt-green)'].map((c, i) => (
                     <div
                       key={i}
-                      className="w-3 h-3 rounded-full border border-pt-black/30"
+                      className="w-3.5 h-3.5 rounded-full border border-pt-black/30"
                       style={{ backgroundColor: c }}
                       aria-hidden="true"
                     />
                   ))}
                   <span
-                    className="ml-1 text-label font-bold text-pt-black/60"
+                    className="ml-1 text-xs font-bold text-pt-black/60 uppercase tracking-wider"
                     style={{ fontFamily: 'var(--font-body)' }}
                   >
                     my_story.txt
@@ -234,10 +237,10 @@ export default function BrainDumpPage() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="ml-auto text-[10px]"
+                        className="ml-auto text-[10px] bg-pt-black/5 px-2 py-0.5 rounded"
                         style={{ color: '#6B6B6B', fontFamily: 'var(--font-body)' }}
                       >
-                        💾 auto-saved
+                        💾 saved
                       </motion.span>
                     )}
                   </AnimatePresence>
@@ -248,12 +251,12 @@ export default function BrainDumpPage() {
                   value={story}
                   onChange={handleStoryChange}
                   placeholder={STORY_PLACEHOLDER}
-                  className="w-full px-5 py-5 text-body leading-relaxed bg-transparent resize-none overflow-hidden focus:outline-none placeholder:text-[#9B9B9B] placeholder:italic"
+                  className="w-full px-5 py-6 text-body leading-relaxed bg-transparent resize-none overflow-hidden focus:outline-none placeholder:text-[#9B9B9B] placeholder:italic"
                   style={{
                     fontFamily: 'var(--font-body)',
                     color:      'var(--pt-black)',
-                    minHeight:  '280px',
-                    fontSize:   '1rem',
+                    minHeight:  '320px',
+                    fontSize:   '1.05rem',
                     lineHeight: '1.8',
                   }}
                   aria-label="Ceritakan situasimu"
@@ -262,7 +265,7 @@ export default function BrainDumpPage() {
                 />
 
                 <div
-                  className="px-5 py-3 border-t border-pt-black/10"
+                  className="px-5 py-4 border-t-2 border-pt-black/10"
                   style={{ backgroundColor: 'var(--pt-white)' }}
                 >
                   <WordCounter wordCount={wordCount} minWords={MIN_WORDS} />
@@ -271,6 +274,7 @@ export default function BrainDumpPage() {
 
               <SubmitSection
                 isReady={isReady}
+                isTooShort={isTooShort}
                 isProcessing={isLoading}
                 wordCount={wordCount}
                 minWords={MIN_WORDS}
@@ -282,7 +286,7 @@ export default function BrainDumpPage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.25, ease: [0.22, 1, 0.36, 1] as const }}
-              className="lg:sticky lg:top-6"
+              className="lg:sticky lg:top-6 flex flex-col gap-4 order-2"
             >
               <HintCard />
               <ExampleStoryCard />
@@ -448,6 +452,7 @@ function PromptStarters({ onSelect }: { onSelect: (text: string) => void }) {
 
 interface SubmitSectionProps {
   isReady:      boolean;
+  isTooShort:   boolean;
   isProcessing: boolean;
   wordCount:    number;
   minWords:     number;
@@ -455,24 +460,24 @@ interface SubmitSectionProps {
 }
 
 function SubmitSection({
-  isReady, isProcessing, wordCount, minWords, onSubmit,
+  isReady, isTooShort, isProcessing, wordCount, minWords, onSubmit,
 }: SubmitSectionProps) {
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
       <motion.div
         className="flex-1 sm:flex-none"
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
+        whileHover={{ scale: isTooShort ? 1 : 1.01 }}
+        whileTap={{ scale: isTooShort ? 1 : 0.99 }}
       >
         <PTButton
           variant={isReady ? 'primary' : 'outline'}
           size="lg"
           onClick={onSubmit}
-          disabled={isProcessing}
+          disabled={isProcessing || isTooShort}
           className="w-full sm:w-auto relative overflow-hidden"
           aria-label="Build My Mission"
         >
-          {isReady && (
+          {isReady && !isTooShort && (
             <motion.div
               className="absolute inset-0 bg-white/20"
               animate={{ x: ['-100%', '200%'] }}
@@ -480,7 +485,7 @@ function SubmitSection({
             />
           )}
           <span className="relative flex items-center gap-2">
-            {isReady ? (
+            {isReady && !isTooShort ? (
               <>✨ Build My Mission</>
             ) : (
               <>🚀 Build My Mission</>
@@ -490,7 +495,18 @@ function SubmitSection({
       </motion.div>
 
       <AnimatePresence mode="wait">
-        {!isReady ? (
+        {isTooShort ? (
+          <motion.p
+            key="too-short"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            className="text-sm font-bold"
+            style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-coral)' }}
+          >
+            ⚠️ Ceritakan sedikit lagi agar Moti paham situasimu.
+          </motion.p>
+        ) : !isReady ? (
           <motion.p
             key="not-ready"
             initial={{ opacity: 0 }}

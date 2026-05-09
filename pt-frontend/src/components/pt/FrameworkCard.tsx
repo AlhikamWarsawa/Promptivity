@@ -21,6 +21,7 @@ interface FrameworkCardProps {
   isTop?:      boolean;       // Top recommendation → special styling
   variant?:    'grid' | 'feature';
   className?:  string;
+  rank?:       number;        // 1, 2, 3...
 }
 
 export function FrameworkCard({
@@ -28,6 +29,7 @@ export function FrameworkCard({
   isTop     = false,
   variant   = 'grid',
   className,
+  rank,
 }: FrameworkCardProps) {
   const meta   = getFramework(framework.frameworkId);
   const FrameworkIcon = meta?.icon;
@@ -52,7 +54,7 @@ export function FrameworkCard({
           'p-3 rounded-sketch border-2 border-pt-black',
           'bg-pt-white cursor-pointer',
           'transition-shadow duration-200',
-          isTop
+          (isTop || rank === 1)
             ? 'shadow-sketch-lg ring-2 ring-pt-yellow'
             : 'shadow-sketch hover:shadow-[6px_6px_0px_#2B2B2B]',
           className,
@@ -61,14 +63,16 @@ export function FrameworkCard({
           borderTop: `4px solid ${meta?.accentColor ?? 'var(--pt-blue)'}`,
         }}
       >
-        {/* Recommended star badge */}
-        {isTop && (
+        {/* Medal Badge for Top 3 */}
+        {rank && rank <= 3 && (
           <div
-            className="absolute -top-3 -right-2 w-8 h-8 rounded-full border-2 border-pt-black flex items-center justify-center text-base"
-            style={{ backgroundColor: 'var(--pt-yellow)', boxShadow: '2px 2px 0 #2B2B2B' }}
-            aria-label="Top recommended framework"
+            className="absolute -top-2.5 -right-2 px-1.5 py-0.5 rounded-sketch border-2 border-pt-black flex items-center justify-center text-[10px] font-bold"
+            style={{ 
+              backgroundColor: rank === 1 ? 'var(--pt-yellow)' : rank === 2 ? '#E5E7EB' : '#FDE68A', 
+              boxShadow: '2px 2px 0 #2B2B2B' 
+            }}
           >
-            ⭐
+            {rank === 1 ? '🥇 Gold' : rank === 2 ? '🥈 Silver' : '🥉 Bronze'}
           </div>
         )}
 
@@ -144,7 +148,7 @@ function FeatureFrameworkCard({
         className="absolute top-4 right-4 px-3 py-1 rounded-sketch border-2 border-pt-black text-label font-bold flex items-center gap-1"
         style={{ backgroundColor: 'var(--pt-yellow)', fontFamily: 'var(--font-body)' }}
       >
-        ⭐ Top Pick
+        🥇 Gold Rank
       </div>
 
       {/* Header */}

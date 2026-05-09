@@ -69,10 +69,10 @@ const buttonVariants = cva(
         ],
       },
       size: {
-        sm: 'px-3 py-1.5 text-xs',
+        sm: 'px-3 py-2 text-xs',
         md: 'px-5 py-2.5 text-sm',
         lg: 'px-8 py-4 text-base font-bold',
-        icon: 'p-2.5 aspect-square',
+        icon: 'p-3 aspect-square',
       },
     },
     defaultVariants: {

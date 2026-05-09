@@ -125,3 +125,34 @@ async def generate_framework_tasks(body: dict):
         return {"success": True, "data": data}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@router.post("/generate-subtasks")
+async def generate_subtasks(body: dict):
+    task_id    = body.get("taskId")
+    task_title = body.get("taskTitle")
+    context    = body.get("context", "")
+    
+    if not task_id or not task_title:
+        raise HTTPException(status_code=400, detail="Missing taskId or taskTitle")
+        
+    try:
+        gemini = get_gemini_service()
+        subtasks = await gemini.generate_subtasks(task_title, context)
+        return {"success": True, "subtasks": subtasks}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+@router.post("/add-more-tasks")
+async def add_more_tasks(body: dict):
+    session_id     = body.get("sessionId")
+    existing_tasks = body.get("existingTasks", [])
+    story_context  = body.get("storyContext", "")
+    
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing sessionId")
+        
+    try:
+        gemini = get_gemini_service()
+        new_tasks = await gemini.generate_more_tasks(session_id, existing_tasks, story_context)
+        return {"success": True, "newTasks": new_tasks}
+    except Exception as e:
+        return {"success": False, "error": str(e)}

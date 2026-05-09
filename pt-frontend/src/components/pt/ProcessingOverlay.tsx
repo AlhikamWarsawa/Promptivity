@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MotiMascot } from './icons';
+import { PTButton } from './PTButton';
 
 /* ============================================
    ProcessingOverlay — Full-screen loading overlay
@@ -37,16 +38,21 @@ interface ProcessingOverlayProps {
   isVisible:   boolean;
   messages?:   ProcessingMessage[];
   onComplete?: () => void;
+  onRetry?:    () => void;
+  onBack?:     () => void;
 }
 
 export function ProcessingOverlay({
   isVisible,
   messages = PT_PROCESSING_MESSAGES,
   onComplete,
+  onRetry,
+  onBack,
 }: ProcessingOverlayProps) {
   const [currentIndex, setCurrentIndex]     = useState(0);
   const [overallProgress, setOverallProgress] = useState(0);
   const [isDone, setIsDone]                 = useState(false);
+  const [showTimeoutControls, setShowTimeoutControls] = useState(false);
 
   // Reset saat overlay ditampilkan ulang
   useEffect(() => {
@@ -54,8 +60,20 @@ export function ProcessingOverlay({
       setCurrentIndex(0);
       setOverallProgress(0);
       setIsDone(false);
+      setShowTimeoutControls(false);
     }
   }, [isVisible]);
+
+  // Timeout detection (30 seconds)
+  useEffect(() => {
+    if (!isVisible || isDone) return;
+
+    const timer = setTimeout(() => {
+      setShowTimeoutControls(true);
+    }, 30000);
+
+    return () => clearTimeout(timer);
+  }, [isVisible, isDone]);
 
   // Cycle through messages
   useEffect(() => {
@@ -123,73 +141,95 @@ export function ProcessingOverlay({
             </div>
 
             {/* Current message */}
-            <div className="text-center space-y-2 min-h-[80px] flex flex-col items-center justify-center">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentIndex}
-                  initial={{ opacity: 0, y: 12, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0,  scale: 1    }}
-                  exit={{ opacity: 0,   y: -12, scale: 0.95 }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                  className="flex flex-col items-center gap-2"
-                >
-                  <span className="text-4xl" role="img" aria-label={currentMessage.icon}>
-                    {currentMessage.icon}
-                  </span>
-                  <p
-                    className="text-h4 text-center"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      color: 'var(--pt-black)',
-                    }}
+            <div className="text-center space-y-2 min-h-[80px] flex flex-col items-center justify-center w-full">
+              {!showTimeoutControls ? (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={currentIndex}
+                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0,  scale: 1    }}
+                    exit={{ opacity: 0,   y: -12, scale: 0.95 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    className="flex flex-col items-center gap-2"
                   >
-                    {currentMessage.text}
+                    <span className="text-4xl" role="img" aria-label={currentMessage.icon}>
+                      {currentMessage.icon}
+                    </span>
+                    <p
+                      className="text-h4 text-center"
+                      style={{
+                        fontFamily: 'var(--font-display)',
+                        color: 'var(--pt-black)',
+                      }}
+                    >
+                      {currentMessage.text}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="space-y-4 w-full"
+                >
+                  <p className="text-h4 text-pt-black font-display">
+                    Lagi loading, mohon tunggu...
                   </p>
+                  <div className="flex flex-col gap-2">
+                    <PTButton variant="primary" size="sm" onClick={onRetry}>
+                      🔄 Retry
+                    </PTButton>
+                    <PTButton variant="outline" size="sm" onClick={onBack}>
+                      ⬅️ Back
+                    </PTButton>
+                  </div>
                 </motion.div>
-              </AnimatePresence>
+              )}
             </div>
 
             {/* Overall progress bar */}
-            <div className="w-full space-y-2">
-              <div
-                className="w-full h-3 rounded-sketch border-2 border-pt-black overflow-hidden"
-                style={{ backgroundColor: 'var(--pt-cream)' }}
-              >
-                <motion.div
-                  className="h-full rounded-sm"
-                  style={{ backgroundColor: 'var(--pt-yellow)' }}
-                  animate={{ width: `${overallProgress}%` }}
-                  transition={{ duration: 0.5, ease: 'easeOut' }}
-                />
-              </div>
-
-              {/* Step indicators */}
-              <div className="flex justify-between">
-                {messages.map((_, i) => (
+            {!showTimeoutControls && (
+              <div className="w-full space-y-2">
+                <div
+                  className="w-full h-3 rounded-sketch border-2 border-pt-black overflow-hidden"
+                  style={{ backgroundColor: 'var(--pt-cream)' }}
+                >
                   <motion.div
-                    key={i}
-                    className="w-2 h-2 rounded-full border border-pt-black"
-                    animate={{
-                      backgroundColor:
-                        i < currentIndex
-                          ? 'var(--pt-green)'
-                          : i === currentIndex
-                          ? 'var(--pt-yellow)'
-                          : 'var(--pt-cream)',
-                      scale: i === currentIndex ? 1.3 : 1,
-                    }}
-                    transition={{ duration: 0.3 }}
+                    className="h-full rounded-sm"
+                    style={{ backgroundColor: 'var(--pt-yellow)' }}
+                    animate={{ width: `${overallProgress}%` }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
                   />
-                ))}
+                </div>
+
+                {/* Step indicators */}
+                <div className="flex justify-between">
+                  {messages.map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="w-2 h-2 rounded-full border border-pt-black"
+                      animate={{
+                        backgroundColor:
+                          i < currentIndex
+                            ? 'var(--pt-green)'
+                            : i === currentIndex
+                            ? 'var(--pt-yellow)'
+                            : 'var(--pt-cream)',
+                        scale: i === currentIndex ? 1.3 : 1,
+                      }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Disclaimer */}
             <p
               className="text-sm text-center"
               style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
             >
-              Biasanya butuh 10–20 detik. Jangan tutup halaman ini.
+              {showTimeoutControls ? 'Koneksi mungkin agak lambat.' : 'Biasanya butuh 10–20 detik. Jangan tutup halaman ini.'}
             </p>
           </motion.div>
         </motion.div>

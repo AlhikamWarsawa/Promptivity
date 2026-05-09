@@ -111,50 +111,50 @@ export function EisenhowerQuadrant({
       className="rounded-sketch border-2 border-pt-black overflow-hidden flex flex-col"
       style={{
         backgroundColor: config.bgColor,
-        boxShadow:       '3px 3px 0px #2B2B2B',
-        minHeight:       '220px',
+        boxShadow:       '2px 2px 0px #2B2B2B',
+        minHeight:       '160px',
       }}
     >
       {/* Quadrant header */}
       <div
-        className="px-4 py-3 border-b-2 border-pt-black"
+        className="px-2 sm:px-4 py-2 sm:py-3 border-b-2 border-pt-black"
         style={{ backgroundColor: config.accentColor + '30' }}
       >
-        <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-2xl" aria-hidden="true">{config.icon}</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5">
+          <span className="text-lg sm:text-2xl" aria-hidden="true">{config.icon}</span>
           <h3
+            className="text-sm sm:text-h4"
             style={{
               fontFamily: 'var(--font-display)',
-              fontSize:   'var(--text-h4)',
               color:      config.textColor,
-              lineHeight: 1.2,
+              lineHeight: 1.1,
             }}
           >
             {config.title}
           </h3>
         </div>
         <p
-          className="text-[11px] font-bold uppercase tracking-wide"
+          className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wide"
           style={{ fontFamily: 'var(--font-body)', color: config.accentColor }}
         >
           {config.subtitle}
         </p>
 
         {/* Task count pill + action text */}
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center justify-between mt-1 sm:mt-2">
           <span
-            className="px-2 py-0.5 rounded-full border-2 border-pt-black text-label font-bold"
+            className="px-1.5 py-0.5 rounded-full border border-pt-black text-[9px] sm:text-label font-bold"
             style={{
               backgroundColor: tasks.length > 0 ? config.accentColor : 'var(--pt-cream)',
               color:           tasks.length > 0 ? 'white'            : 'var(--pt-black)',
               fontFamily:      'var(--font-body)',
             }}
           >
-            {tasks.length} task
+            {tasks.length}
           </span>
           {tasks.length > 0 && (
             <p
-              className="text-[10px] font-semibold text-right max-w-[120px]"
+              className="hidden sm:block text-[10px] font-semibold text-right max-w-[120px]"
               style={{ fontFamily: 'var(--font-body)', color: config.accentColor }}
             >
               {config.actionText}

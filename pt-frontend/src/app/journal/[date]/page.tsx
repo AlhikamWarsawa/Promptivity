@@ -141,7 +141,6 @@ export default function JournalDetailPage() {
           {/* Right Column: Recommendations & Stats */}
           <div className="space-y-6">
             <section className="p-6 rounded-sketch border-2 border-pt-black bg-pt-yellow shadow-sketch">
-              <h2 className="text-label font-bold uppercase mb-4 tracking-wider">Recommendations</h2>
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-bold text-pt-brown uppercase">Top Framework</p>

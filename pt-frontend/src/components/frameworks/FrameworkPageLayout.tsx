@@ -7,8 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn }                      from '@/lib/utils';
 import { PTButton }                from '@/components/pt/PTButton';
 import { ScoreBar }                from '@/components/pt/ScoreBar';
-import { getFramework }            from '@/lib/frameworkConfig';
+import { getFramework, getSortedFrameworkIds } from '@/lib/frameworkConfig';
 import { usePTStore }              from '@/store/usePTStore';
+import { EmptyState }              from '@/components/pt/EmptyState';
 import type { FrameworkId }        from '@/types/pt.types';
 
 interface FrameworkPageLayoutProps {
@@ -40,19 +41,36 @@ export function FrameworkPageLayout({
   const isTopPick = session?.topRecommendation === frameworkId;
   const isGenerated = fwData && fwData.rawData && Object.keys(fwData.rawData).length > 0;
 
-  const FRAMEWORK_ORDER: FrameworkId[] = [
-    'gtd', 'kanban', 'time-blocking', 'eat-the-frog', 'pomodoro',
-    'eisenhower', 'systemist', 'medium-method', 'okrs',
-    'weekly-review', 'commitment-inventory', 'smart-goals', 'para',
-  ];
-  const currentIdx = FRAMEWORK_ORDER.indexOf(frameworkId);
-  const prevId     = currentIdx > 0 ? FRAMEWORK_ORDER[currentIdx - 1] : null;
-  const nextId     = currentIdx < FRAMEWORK_ORDER.length - 1 ? FRAMEWORK_ORDER[currentIdx + 1] : null;
+  if (!session) {
+    return (
+      <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--pt-white)' }}>
+        <header className="px-6 py-4 border-b-2 border-pt-black">
+          <PTButton variant="outline" size="sm" onClick={() => router.push('/')}>← Back Home</PTButton>
+        </header>
+        <main className="flex-1 flex items-center justify-center p-6">
+          <EmptyState 
+            icon="🏜️"
+            message="No active mission found"
+            subMessage="You need to share your story first so Moti can build these frameworks for you."
+          />
+        </main>
+      </div>
+    );
+  }
+
+  const sortedIds  = session ? getSortedFrameworkIds(session.frameworks) : [];
+  const currentIdx = sortedIds.indexOf(frameworkId);
+  const prevId     = currentIdx > 0 ? sortedIds[currentIdx - 1] : null;
+  const nextId     = currentIdx < sortedIds.length - 1 ? sortedIds[currentIdx + 1] : null;
+
   const prevMeta   = prevId ? getFramework(prevId) : null;
   const nextMeta   = nextId ? getFramework(nextId) : null;
 
+  const prevScore  = prevId ? session?.frameworks.find(f => f.frameworkId === prevId)?.recommendationScore : null;
+  const nextScore  = nextId ? session?.frameworks.find(f => f.frameworkId === nextId)?.recommendationScore : null;
+
   const handleGenerate = async () => {
-    if (localLoading) return; // Debounce
+    if (localLoading) return;
     setLocalLoading(true);
     await generate(frameworkId);
     setLocalLoading(false);
@@ -69,7 +87,6 @@ export function FrameworkPageLayout({
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--pt-white)' }}>
-      {/* Sticky Header */}
       <motion.header
         className="sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-3"
         style={{ backgroundColor: 'var(--pt-white)', borderBottom: '2px solid var(--pt-black)' }}
@@ -96,7 +113,6 @@ export function FrameworkPageLayout({
         <Link href="/onboarding/brain-dump" className="ml-auto sm:ml-2 text-label font-bold underline">✍️ Cerita Baru</Link>
       </motion.header>
 
-      {/* Hero Section */}
       <section className="px-4 sm:px-6 py-10" style={{ background: `linear-gradient(135deg, ${meta.accentColor}18 0%, var(--pt-white) 60%)`, borderBottom: '2px solid var(--pt-black)' }}>
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-6">
           <div className="w-20 h-20 rounded-sketch border-2 border-pt-black flex items-center justify-center shrink-0" style={{ backgroundColor: meta.accentColor + '30', boxShadow: '5px 5px 0px #2B2B2B' }}>
@@ -124,7 +140,6 @@ export function FrameworkPageLayout({
         </div>
       </section>
 
-      {/* Main Content */}
       <main className={cn('px-4 sm:px-6 py-8', className)}>
         <div className="max-w-4xl mx-auto">
           {!isGenerated ? (
@@ -140,20 +155,21 @@ export function FrameworkPageLayout({
         </div>
       </main>
 
-      {/* Navigation */}
-      <nav className="border-t-2 border-pt-black px-4 sm:px-6 py-5 bg-pt-cream">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-          {prevMeta ? (
-            <Link href={prevMeta.route} className="flex items-center gap-2 px-4 py-2 rounded-sketch border-2 border-pt-black font-bold text-sm bg-pt-white shadow-sketch transition-all hover:translate-y-[-2px]">
-              <ChevronLeft /> <span className="hidden sm:inline">{prevMeta.shortName}</span>
-            </Link>
-          ) : <div />}
-          <PTButton variant="primary" size="sm" onClick={() => router.push('/dashboard')}>Dashboard</PTButton>
-          {nextMeta ? (
-            <Link href={nextMeta.route} className="flex items-center gap-2 px-4 py-2 rounded-sketch border-2 border-pt-black font-bold text-sm bg-pt-white shadow-sketch transition-all hover:translate-y-[-2px]">
-              <span className="hidden sm:inline">{nextMeta.shortName}</span> <ChevronRight />
-            </Link>
-          ) : <div />}
+      <nav className="border-t-2 border-pt-black px-4 sm:px-6 py-6 bg-pt-cream">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="flex gap-3 sm:gap-4 order-2 sm:order-1">
+            {prevMeta && (
+              <Link href={prevMeta.route} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-sketch border-2 border-pt-black font-bold text-sm bg-pt-white shadow-sketch transition-all hover:translate-y-[-2px]">
+                <ChevronLeft /> <span className="sm:inline">{prevMeta.shortName} ({prevScore})</span>
+              </Link>
+            )}
+            {nextMeta && (
+              <Link href={nextMeta.route} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-sketch border-2 border-pt-black font-bold text-sm bg-pt-white shadow-sketch transition-all hover:translate-y-[-2px]">
+                <span className="sm:inline">{nextMeta.shortName} ({nextScore})</span> <ChevronRight />
+              </Link>
+            )}
+          </div>
+          <PTButton variant="primary" size="sm" onClick={() => router.push('/dashboard')} className="order-1 sm:order-2">Dashboard</PTButton>
         </div>
       </nav>
     </div>
@@ -187,10 +203,6 @@ function FrameworkPlaceholder({ meta, isLoading, error, onGenerate }: any) {
       >
         {isLoading ? 'Membangun...' : 'Bangun Framework Ini'}
       </PTButton>
-      
-      <p className="mt-4 text-[11px] text-gray-400 italic">
-        *Membangun framework spesifik membutuhkan waktu sekitar 10-15 detik.
-      </p>
     </div>
   );
 }
@@ -200,10 +212,10 @@ function ChevronRight() { return <svg width="16" height="16" viewBox="0 0 16 16"
 
 export function FrameworkEmptyState({ frameworkId, message }: { frameworkId: string; message?: string }) {
   return (
-    <div className="text-center py-16 rounded-sketch border-2 border-pt-black/20 bg-pt-cream">
-      <p className="text-5xl mb-4">🤖</p>
-      <h3 className="text-h3 mb-2" style={{ fontFamily: 'var(--font-display)' }}>{frameworkId.toUpperCase()} Kosong</h3>
-      <p className="text-sm max-w-sm mx-auto text-gray-500" style={{ fontFamily: 'var(--font-body)' }}>{message ?? 'Data tidak tersedia untuk framework ini.'}</p>
-    </div>
+    <EmptyState 
+      icon="🤖"
+      message={`${frameworkId.toUpperCase()} Kosong`}
+      subMessage={message ?? 'Data tidak tersedia untuk framework ini.'}
+    />
   );
 }

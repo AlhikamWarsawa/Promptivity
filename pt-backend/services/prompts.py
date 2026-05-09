@@ -43,7 +43,7 @@ You are Moti, the AI core of Promptivity. Analyze the user's story and provide a
       "score": 0-100,
       "reason": "<1 sentence why this fits>"
     }},
-    ... (all 13 frameworks: gtd, kanban, time-blocking, eat-the-frog, pomodoro, eisenhower, systemist, medium-method, okrs, weekly-review, commitment-inventory, smart-goals, para)
+    ... (all 15 frameworks: gtd, kanban, time-blocking, eat-the-frog, pomodoro, eisenhower, systemist, medium-method, okrs, weekly-review, commitment-inventory, smart-goals, para, deep-work, pareto)
   ]
 }}
 
@@ -62,7 +62,7 @@ Output language MUST match the user's input language.
 
 Framework recommendations MUST adapt based on preferred style and energy pattern, not random scoring.
 
-Note: Return EXACTLY 13 framework scores. Master tasks should be max 8 most critical items.
+Note: Return EXACTLY 15 framework scores. Master tasks should be max 8 most critical items.
 """
 
 # --- Framework Specific Prompt ---
@@ -88,6 +88,8 @@ You are Moti. Build a deep-dive plan for the specified framework based on the us
 - commitment-inventory: {{ "commitments": [{{ "name": "", "urgency": "medium", "category": "work", "recommendation": "continue", "reason": "" }}] }}
 - smart-goals: {{ "goals": [{{ "title": "", "specific": "", "measurable": "", "achievable": "", "relevant": "", "timeBound": "", "progress": 0 }}] }}
 - para: {{ "projects": [{{ "name": "", "description": "", "tasks": [] }}], "areas": [], "resources": [], "archives": [] }}
+- deep-work: {{ "focusGoal": "", "deepBlocks": [{{ "start": "09:00", "end": "11:00", "task": "" }}], "shallowTasks": [], "distractions": [], "shutdownRitual": [] }}
+- pareto: {{ "highImpact": [], "maintenance": [], "eliminate": [], "leverage": [] }}
 
 ## PERSONALIZATION RULES
 Gemini must adapt task details and schedules based on user profile.

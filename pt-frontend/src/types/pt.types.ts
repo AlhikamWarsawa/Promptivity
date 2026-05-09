@@ -15,7 +15,9 @@ export type FrameworkId =
   | 'weekly-review'
   | 'commitment-inventory'
   | 'smart-goals'
-  | 'para';
+  | 'para'
+  | 'deep-work'
+  | 'pareto';
 
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -64,6 +66,8 @@ export interface Task {
   category: string;
   isCompleted: boolean;
   framework: FrameworkId;
+  subtasks?: string[];
+  durationLabel?: string;
 }
 
 // ============================================
@@ -173,6 +177,25 @@ export interface PARAData {
   archives: { name: string; description: string }[];
 }
 
+export interface DeepWorkData {
+  focusGoal: string;
+  deepBlocks: {
+    start: string;
+    end: string;
+    task: string;
+  }[];
+  shallowTasks: string[];
+  distractions: string[];
+  shutdownRitual: string[];
+}
+
+export interface ParetoData {
+  highImpact: string[];
+  maintenance: string[];
+  eliminate: string[];
+  leverage: string[];
+}
+
 export type FrameworkRawData =
   | GTDData
   | KanbanData
@@ -186,7 +209,9 @@ export type FrameworkRawData =
   | WeeklyReviewData
   | CommitmentInventoryData
   | SMARTGoalsData
-  | PARAData;
+  | PARAData
+  | DeepWorkData
+  | ParetoData;
 
 // ============================================
 // Framework Output (dari AI)

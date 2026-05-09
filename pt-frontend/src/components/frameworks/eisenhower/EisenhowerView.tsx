@@ -69,21 +69,38 @@ export function EisenhowerView() {
         <strong>penting</strong>. Fokuslah pada kuadran kiri atas dulu.
       </motion.div>
 
-      {/* Desktop: Matrix dengan axis labels */}
-      <div className="hidden md:block">
-        <MatrixWithAxisLabels rawData={rawData} />
-      </div>
+      {/* Matrix Grid (2x2) */}
+      <div className="flex flex-col gap-4">
+        {/* Urgent/Not Urgent Labels */}
+        <div className="flex pl-8 sm:pl-12 gap-2 sm:gap-3">
+          {['⚡ Urgent', '🌊 Later'].map((label) => (
+            <div key={label} className="flex-1 text-center">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-pt-black/50">
+                {label}
+              </span>
+            </div>
+          ))}
+        </div>
 
-      {/* Mobile: Stacked cards, sorted by priority */}
-      <div className="md:hidden space-y-4">
-        {QUADRANT_ORDER.map((quadrantId, i) => (
-          <EisenhowerQuadrant
-            key={quadrantId}
-            quadrantId={quadrantId}
-            tasks={rawData[quadrantId] ?? []}
-            index={i}
-          />
-        ))}
+        <div className="flex gap-2 sm:gap-3">
+          {/* Important/Not Important Vertical Labels */}
+          <div className="flex flex-col gap-2 sm:gap-3 w-6 sm:w-10 shrink-0">
+            {['🎯 Penting', '📎 Sekunder'].map((label) => (
+              <div key={label} className="flex-1 flex items-center justify-center">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-pt-black/50 vertical-text rotate-180">
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3">
+            <EisenhowerQuadrant quadrantId="doNow"    tasks={rawData.doNow    ?? []} index={0} />
+            <EisenhowerQuadrant quadrantId="schedule" tasks={rawData.schedule ?? []} index={1} />
+            <EisenhowerQuadrant quadrantId="delegate"  tasks={rawData.delegate  ?? []} index={2} />
+            <EisenhowerQuadrant quadrantId="eliminate" tasks={rawData.eliminate ?? []} index={3} />
+          </div>
+        </div>
       </div>
 
       {/* Summary row — always visible */}

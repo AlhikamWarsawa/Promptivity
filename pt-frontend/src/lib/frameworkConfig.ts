@@ -1,5 +1,5 @@
 import React from 'react';
-import type { FrameworkId } from '@/types/pt.types';
+import type { FrameworkId, FrameworkOutput } from '@/types/pt.types';
 import * as Icons from '@/components/pt/icons';
 
 export interface FrameworkMeta {
@@ -186,6 +186,32 @@ export const FRAMEWORKS: Record<FrameworkId, FrameworkMeta> = {
     bestFor: ['knowledge-worker', 'structured', 'profesional'],
     keywords: ['organisasi informasi', 'banyak dokumen', 'notes', 'knowledge management'],
   },
+  'deep-work': {
+    id: 'deep-work',
+    name: 'Attention Management',
+    shortName: 'Deep Work',
+    tagline: 'Focus intensely. Eliminate distractions.',
+    description: 'Deep Work membantu kamu mengelola fokus, mengurangi distraksi, dan menjadwalkan sesi kerja mendalam untuk tugas yang membutuhkan kognitif tinggi.',
+    accentColor: '#8B5CF6',
+    bgColor: '#F3E8FF',
+    icon: Icons.DeepWorkIcon,
+    route: '/frameworks/deep-work',
+    bestFor: ['knowledge-worker', 'mahasiswa', 'profesional'],
+    keywords: ['fokus', 'distraksi', 'deep work', 'konsentrasi', 'flow'],
+  },
+  'pareto': {
+    id: 'pareto',
+    name: 'Impact Optimization',
+    shortName: 'Pareto Principle',
+    tagline: '80% of results come from 20% of efforts.',
+    description: 'Prinsip Pareto (80/20) membantu kamu mengidentifikasi tugas leverage tinggi yang memberikan dampak terbesar, dan meminimalisir tugas bernilai rendah.',
+    accentColor: '#14B8A6',
+    bgColor: '#CCFBF1',
+    icon: Icons.ParetoIcon,
+    route: '/frameworks/pareto',
+    bestFor: ['entrepreneur', 'profesional', 'overwhelmed'],
+    keywords: ['dampak', 'prioritas utama', '80/20', 'leverage', 'efisiensi'],
+  },
 };
 
 export const FRAMEWORK_LIST = Object.values(FRAMEWORKS);
@@ -200,4 +226,13 @@ export function getRecommendedFrameworks(
   limit = 3
 ): FrameworkMeta[] {
   return ids.slice(0, limit).map((id) => FRAMEWORKS[id]);
+}
+
+/**
+ * Sorts frameworks by recommendation score descending.
+ */
+export function getSortedFrameworkIds(frameworks: FrameworkOutput[]): FrameworkId[] {
+  return [...frameworks]
+    .sort((a, b) => b.recommendationScore - a.recommendationScore)
+    .map((f) => f.frameworkId);
 }

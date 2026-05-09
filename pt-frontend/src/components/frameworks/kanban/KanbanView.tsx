@@ -98,17 +98,18 @@ export function KanbanView() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="flex flex-row overflow-x-auto sm:grid sm:grid-cols-3 gap-4 pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
           {COLUMNS.map((col) => (
-            <KanbanColumn
-              key={col.id}
-              id={col.id}
-              title={col.title}
-              icon={col.icon}
-              tasks={rawData[col.id] ?? []}
-              accentColor={col.accentColor}
-              bgColor={col.bgColor}
-            />
+            <div key={col.id} className="min-w-[280px] sm:min-w-0 flex-1">
+              <KanbanColumn
+                id={col.id}
+                title={col.title}
+                icon={col.icon}
+                tasks={rawData[col.id] ?? []}
+                accentColor={col.accentColor}
+                bgColor={col.bgColor}
+              />
+            </div>
           ))}
         </div>
 

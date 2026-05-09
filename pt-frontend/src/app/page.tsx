@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, useInView } from 'framer-motion';
 import { useRef, useState, useEffect } from 'react';
+import { usePTStore } from '@/store/usePTStore';
 import { PTButton } from '@/components/pt/PTButton';
 import { PTCard } from '@/components/pt/PTCard';
 import { HandDrawnDivider } from '@/components/pt/HandDrawnDivider';
@@ -28,14 +29,20 @@ export default function WelcomePage() {
   const [mounted, setMounted] = useState(false);
   const [hasSession, setHasSession] = useState(false);
 
+  const isAuthenticated = usePTStore((s) => s.isAuthenticated);
+  const isAuthHydrated = usePTStore((s) => s.isAuthHydrated);
+
   useEffect(() => {
     setMounted(true);
-    const session = PTStorage.getSession();
-    if (session) {
-      setHasSession(true);
-      router.push('/dashboard');
+    
+    if (isAuthHydrated) {
+      const session = PTStorage.getSession();
+      if (session || isAuthenticated) {
+        setHasSession(true);
+        router.replace('/dashboard');
+      }
     }
-  }, [router]);
+  }, [router, isAuthenticated, isAuthHydrated]);
 
   if (!mounted) {
     // Return skeleton yang sama persis dengan Navbar
@@ -217,11 +224,11 @@ function HeroSection({
 
             {/* Main tagline (Typewriter) */}
             <motion.div variants={itemVariants}>
-              <h1
+                <h1
                 className="leading-tight flex flex-col"
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontSize: 'clamp(2.5rem, 6vw, 4rem)',
+                  fontSize: 'clamp(2rem, 8vw, 4rem)',
                   color: 'var(--pt-black)',
                   lineHeight: 1.1,
                   minHeight: '2.2em', // Reserve space to avoid layout shift
@@ -247,13 +254,13 @@ function HeroSection({
             {/* CTA Buttons */}
             <motion.div
               variants={itemVariants}
-              className="flex flex-col sm:flex-row gap-3"
+              className="flex flex-col sm:flex-row gap-4"
             >
               <PTButton
                 variant="secondary"
                 size="lg"
                 onClick={onSkip}
-                className="group"
+                className="group w-full sm:w-auto"
               >
                 <span>🚀 {hasSession ? 'Dashboard' : 'Start Without Account'}</span>
               </PTButton>
@@ -262,6 +269,7 @@ function HeroSection({
                   variant="ghost"
                   size="lg"
                   onClick={onLogin}
+                  className="w-full sm:w-auto"
                 >
                   Login →
                 </PTButton>

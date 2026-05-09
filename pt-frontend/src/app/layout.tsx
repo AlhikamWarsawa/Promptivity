@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 import { StoreInitializer } from '@/components/pt/StoreInitializer';
+import { AuthGuard } from '@/components/pt/AuthGuard';
+import { StorageFullModal } from '@/components/pt/StorageFullModal';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -61,7 +63,10 @@ export default function RootLayout({
         }}
       >
         <StoreInitializer />
-        {children}
+        <StorageFullModal />
+        <AuthGuard>
+          {children}
+        </AuthGuard>
       </body>
     </html>
   );

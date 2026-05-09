@@ -277,6 +277,76 @@ class GeminiService:
         data = json.loads(parsed)
         return data
 
+    async def generate_subtasks(self, task_title: str, context: str) -> list[str]:
+        model = genai.GenerativeModel("gemini-1.5-flash-8b")
+        
+        prompt = f"""
+        User Task: "{task_title}"
+        Story Context: "{context}"
+
+        You are Moti, the AI Productivity Mascot.
+        Your goal is to break down the task above into 3-5 small, extremely actionable subtasks.
+        
+        Rules:
+        1. Keep it simple and motivating.
+        2. Use the same language as the task title.
+        3. Each subtask should be a single action.
+        4. Return ONLY a JSON list of strings.
+        """
+
+        try:
+            response = await asyncio.to_thread(
+                model.generate_content,
+                prompt,
+                generation_config=GENERATION_CONFIG,
+                safety_settings=SAFETY_SETTINGS
+            )
+            
+            data = json.loads(response.text)
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and "subtasks" in data:
+                return data["subtasks"]
+            return []
+        except Exception as e:
+            print(f"Error generating subtasks: {e}")
+            return []
+    async def generate_more_tasks(self, session_id: str, existing_tasks: list, context: str) -> list:
+        """Generate 3-5 additional tasks based on story context and existing tasks."""
+        existing_titles = [t.get("title", "") for t in existing_tasks]
+        
+        prompt = f"""
+        User Story Context: "{context}"
+        Current Task List: {json.dumps(existing_titles)}
+
+        You are Moti, the AI Productivity Mascot.
+        The user has completed all their current tasks and needs more momentum!
+        
+        Your goal:
+        Generate 3-5 NEW tasks that are relevant to their story but NOT already in the list above.
+        
+        Task Requirements:
+        - Title: Action-oriented, concise.
+        - Description: Brief explanation of why this is important.
+        - Priority: low, medium, high, or critical.
+        - EstimatedMinutes: 5 to 480.
+        - Category: e.g. Work, Study, Personal, Health.
+
+        Return ONLY a JSON object with the key "newTasks" containing a list of task objects.
+        """
+
+        try:
+            response_text = await self._call_gemini(
+                system_instruction="You are a productivity expert AI. Generate new relevant tasks.",
+                prompt=prompt
+            )
+            parsed = self._extract_json(response_text)
+            data = json.loads(parsed)
+            return data.get("newTasks", [])
+        except Exception as e:
+            print(f"Error generating more tasks: {e}")
+            return []
+
 # Singleton
 _gemini_service: Optional[GeminiService] = None
 

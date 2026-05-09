@@ -108,7 +108,7 @@ export function parseTask(raw: unknown, frameworkId: FrameworkId = 'gtd'): Task 
 /* ============================================
    parseTasks — Parse array of tasks
    ============================================ */
-function parseTasks(raw: unknown, frameworkId: FrameworkId): Task[] {
+export function parseTasks(raw: unknown, frameworkId: FrameworkId): Task[] {
   return safeArr(raw).map((item) => parseTask(item, frameworkId));
 }
 

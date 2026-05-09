@@ -20,6 +20,7 @@ export const STORAGE_KEYS = {
   SESSION_BY_DATE:   'pt_session_',          // Prefix for session by date: pt_session_YYYY-MM-DD
   TOKEN:             'pt_token',
   USER:              'pt_user',
+  ONBOARDED:         'pt_has_onboarded',
 } as const;
 
 type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
@@ -49,6 +50,9 @@ export function save(key: string, data: unknown): boolean {
   } catch (e) {
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
       console.warn('PT Storage: localStorage quota exceeded. Consider clearing old sessions.');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('pt_storage_full'));
+      }
     } else {
       console.warn('PT Storage: Failed to save', key, e);
     }
@@ -237,6 +241,29 @@ export function getUser(): any | null {
   return load<any>(STORAGE_KEYS.USER);
 }
 
+/**
+ * Hapus 5 session tertua untuk melegakan storage.
+ * Mencari key pt_session_YYYY-MM-DD.
+ */
+export function clearOldSessions(): number {
+  try {
+    const dates = getAllSessionDates();
+    if (dates.length <= 1) return 0; // Sisakan minimal 1
+
+    const toRemove = dates.slice(0, Math.min(5, dates.length - 1));
+    toRemove.forEach((date) => {
+      remove(`${STORAGE_KEYS.SESSION_BY_DATE}${date}`);
+    });
+
+    const newIndex = dates.filter((d) => !toRemove.includes(d));
+    save(STORAGE_KEYS.JOURNAL_INDEX, newIndex);
+    
+    return toRemove.length;
+  } catch {
+    return 0;
+  }
+}
+
 export function clearAuth(): void {
   remove(STORAGE_KEYS.TOKEN);
   remove(STORAGE_KEYS.USER);
@@ -279,6 +306,7 @@ export const PTStorage = {
   saveSessionByDate,
   getSessionsByDate,
   getAllSessionDates,
+  clearOldSessions,
   // Auth
   saveToken,
   getToken,

@@ -14,6 +14,7 @@ import { create }     from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { PTSession, Personalization, Task } from '@/types/pt.types';
 import { processStoryAPI }                 from '@/lib/gemini';
+import { parseSession, parseTasks }                 from '@/lib/parsers';
 import PTStorage                           from '@/lib/storage';
 import { API }                             from '@/lib/api';
 
@@ -30,6 +31,8 @@ export interface PTStoreState {
   token:           string | null;
   user:            { id: string, name: string, email: string } | null;
   isAuthenticated: boolean;
+  isAuthHydrated:  boolean;
+  hasCompletedOnboarding: boolean;
 
   // Actions
   processStory: (
@@ -61,6 +64,15 @@ export interface PTStoreState {
   logout:           () => void;
   initializeAuth:   () => Promise<void>;
   generateFrameworkTasks: (frameworkId: string) => Promise<{ success: boolean; error?: string }>;
+  fetchLatestSession: () => Promise<void>;
+  setHasCompletedOnboarding: (val: boolean) => void;
+
+  // Task Operations
+  addTask: (task: Partial<Task>) => void;
+  editTask: (taskId: string, updates: Partial<Task>) => void;
+  deleteTask: (taskId: string) => void;
+  generateSubtasks: (taskId: string) => Promise<void>;
+  addMoreTasks: () => Promise<void>;
 }
 
 /* ---- Store Implementation ---- */
@@ -79,21 +91,16 @@ export const usePTStore = create<PTStoreState>()(
     token:           null,
     user:            null,
     isAuthenticated: false,
+    isAuthHydrated:  false,
+    hasCompletedOnboarding: false,
 
     // ---- Actions ----
 
-    /**
-     * Main action: process user story via Gemini.
-     * Handles loading state, error state, and auto-save.
-     */
     processStory: async (storyText, personalization) => {
       const { isLoading } = get();
       if (isLoading) return { success: false };
 
-      // Clear previous error
       set({ isLoading: true, error: null });
-
-      // Get personalization from storage if not provided
       const finalPersonalization = personalization ?? PTStorage.getPersonaOrDefault();
 
       try {
@@ -108,21 +115,16 @@ export const usePTStore = create<PTStoreState>()(
           return { success: false, error: errMsg };
         }
 
-        // Success — update store & save to localStorage
         set({
           session:   result.session,
           isLoading: false,
           error:     null,
         });
 
-        // Auto-save (triggered by subscriber below, but also explicit here)
         PTStorage.saveSession(result.session);
-        
-        // Save to Journal (Local)
         const localDate = new Date().toLocaleDateString('en-CA');
         PTStorage.saveSessionByDate(localDate, result.session);
 
-        // Save to Backend (if auth)
         const { isAuthenticated } = get();
         if (isAuthenticated) {
           API.post('/sessions', {
@@ -133,25 +135,22 @@ export const usePTStore = create<PTStoreState>()(
           }).catch(err => console.error('Failed to sync session to backend:', err));
         }
 
+        set({ hasCompletedOnboarding: true });
+        PTStorage.save(PTStorage.KEYS.ONBOARDED, true);
+
         return { success: true };
 
       } catch (err) {
-        const errMsg = err instanceof Error
-          ? err.message
-          : 'Terjadi kesalahan tidak terduga.';
+        const errMsg = err instanceof Error ? err.message : 'Terjadi kesalahan tidak terduga.';
         set({ isLoading: false, error: errMsg });
         return { success: false, error: errMsg };
       }
     },
 
-    /**
-     * Generate data for a specific framework on demand.
-     */
     generateFramework: async (frameworkId) => {
       const { session, isLoading } = get();
       if (!session || isLoading) return { success: false, error: 'No active session or already loading' };
 
-      // Check if already generated
       const fw = session.frameworks.find(f => f.frameworkId === frameworkId);
       if (fw && fw.rawData && Object.keys(fw.rawData).length > 0) {
         return { success: true };
@@ -169,7 +168,6 @@ export const usePTStore = create<PTStoreState>()(
           return { success: false, error: errMsg };
         }
 
-        // Update framework in session
         const updatedFrameworks = session.frameworks.map(f => 
           f.frameworkId === frameworkId ? result.data : f
         );
@@ -185,65 +183,44 @@ export const usePTStore = create<PTStoreState>()(
       }
     },
 
-    /**
-     * Load existing session from localStorage.
-     * Called on app init / page mount.
-     */
     loadFromStorage: () => {
-      if (get().loadedFromStorage) return;   // Jangan load dua kali
-
+      if (get().loadedFromStorage) return;
       const storedSession = PTStorage.getSession();
       const storedConfused = PTStorage.getConfusedMessages();
+      const hasOnboarded = PTStorage.load<boolean>(PTStorage.KEYS.ONBOARDED) || false;
 
       set({
         session:          storedSession,
         confusedMessages: storedConfused,
         loadedFromStorage: true,
+        hasCompletedOnboarding: storedSession ? true : hasOnboarded,
       });
     },
 
-    /**
-     * Manually set session (untuk testing / demo mode).
-     */
     setSession: (session) => {
       set({ session });
       PTStorage.saveSession(session);
     },
 
-    /**
-     * Clear session dari store + localStorage.
-     */
     clearSession: () => {
       set({ session: null, error: null });
       PTStorage.clearSession();
     },
 
-    /**
-     * Clear error state.
-     */
     clearError: () => set({ error: null }),
 
-    /**
-     * Toggle task completion
-     */
     toggleTask: (taskId) => {
       const { session } = get();
       if (!session) return;
 
-      // Update task di masterTaskList
       const updatedMasterList = session.masterTaskList.map((task) =>
-        task.id === taskId
-          ? { ...task, isCompleted: !task.isCompleted }
-          : task,
+        task.id === taskId ? { ...task, isCompleted: !task.isCompleted } : task,
       );
 
-      // Update task di semua framework rawData dan tasks
       const updatedFrameworks = session.frameworks.map((fw) => ({
         ...fw,
         tasks: fw.tasks.map((task) =>
-          task.id === taskId
-            ? { ...task, isCompleted: !task.isCompleted }
-            : task,
+          task.id === taskId ? { ...task, isCompleted: !task.isCompleted } : task,
         ),
       }));
 
@@ -254,13 +231,8 @@ export const usePTStore = create<PTStoreState>()(
       };
 
       set({ session: updatedSession });
-      // Auto-save via subscriber
     },
 
-    /**
-     * Move a Kanban card between columns.
-     * Updates rawData for the kanban framework.
-     */
     moveKanbanCard: (taskId, toColumn) => {
       const { session } = get();
       if (!session) return;
@@ -268,41 +240,27 @@ export const usePTStore = create<PTStoreState>()(
       const updatedFrameworks = session.frameworks.map((fw) => {
         if (fw.frameworkId !== 'kanban') return fw;
 
-        const rawData = fw.rawData as {
-          backlog:    Task[];
-          inProgress: Task[];
-          done:       Task[];
-        };
-
-        // Remove task dari semua kolom
+        const rawData = fw.rawData as any;
         let movedTask: Task | undefined;
-        const newBacklog    = (rawData.backlog ?? []).filter((t) => {
+        
+        const newBacklog = (rawData.backlog ?? []).filter((t: any) => {
           if (t.id === taskId) { movedTask = t; return false; } return true;
         });
-        const newInProgress = (rawData.inProgress ?? []).filter((t) => {
+        const newInProgress = (rawData.inProgress ?? []).filter((t: any) => {
           if (t.id === taskId) { movedTask = t; return false; } return true;
         });
-        const newDone       = (rawData.done ?? []).filter((t) => {
+        const newDone = (rawData.done ?? []).filter((t: any) => {
           if (t.id === taskId) { movedTask = t; return false; } return true;
         });
 
         if (!movedTask) return fw;
 
-        // Update isCompleted berdasarkan kolom
-        const updatedTask = {
-          ...movedTask,
-          isCompleted: toColumn === 'done',
-        };
-
-        // Tambahkan ke kolom tujuan
+        const updatedTask = { ...movedTask, isCompleted: toColumn === 'done' };
         if (toColumn === 'backlog')    newBacklog.push(updatedTask);
         if (toColumn === 'inProgress') newInProgress.push(updatedTask);
         if (toColumn === 'done')       newDone.push(updatedTask);
 
-        return {
-          ...fw,
-          rawData: { ...rawData, backlog: newBacklog, inProgress: newInProgress, done: newDone },
-        };
+        return { ...fw, rawData: { ...rawData, backlog: newBacklog, inProgress: newInProgress, done: newDone } };
       });
 
       set({ session: { ...session, frameworks: updatedFrameworks } });
@@ -314,26 +272,14 @@ export const usePTStore = create<PTStoreState>()(
 
       const updatedFrameworks = session.frameworks.map((fw) => {
         if (fw.frameworkId !== 'okrs') return fw;
-
-        const rawData = fw.rawData as {
-          objective:  string;
-          keyResults: Array<{ kr: string; metric: string; deadline: string; progress: number }>;
-        };
-
-        const updatedKRs = (rawData.keyResults ?? []).map((kr, i) =>
-          i === krIndex
-            ? { ...kr, progress: Math.max(0, Math.min(100, progress)) }
-            : kr,
+        const rawData = fw.rawData as any;
+        const updatedKRs = (rawData.keyResults ?? []).map((kr: any, i: number) =>
+          i === krIndex ? { ...kr, progress: Math.max(0, Math.min(100, progress)) } : kr,
         );
-
-        return {
-          ...fw,
-          rawData: { ...rawData, keyResults: updatedKRs },
-        };
+        return { ...fw, rawData: { ...rawData, keyResults: updatedKRs } };
       });
 
       set({ session: { ...session, frameworks: updatedFrameworks } });
-      // Auto-save via subscriber
     },
 
     updateGoalProgress: (goalIndex, progress) => {
@@ -342,33 +288,20 @@ export const usePTStore = create<PTStoreState>()(
 
       const updatedFrameworks = session.frameworks.map((fw) => {
         if (fw.frameworkId !== 'smart-goals') return fw;
-
-        const rawData = fw.rawData as {
-          goals: Array<{
-            title: string; specific: string; measurable: string;
-            achievable: string; relevant: string; timeBound: string;
-            progress: number;
-          }>;
-        };
-
-        const updatedGoals = (rawData.goals ?? []).map((goal, i) =>
-          i === goalIndex
-            ? { ...goal, progress: Math.max(0, Math.min(100, progress)) }
-            : goal,
+        const rawData = fw.rawData as any;
+        const updatedGoals = (rawData.goals ?? []).map((goal: any, i: number) =>
+          i === goalIndex ? { ...goal, progress: Math.max(0, Math.min(100, progress)) } : goal,
         );
-
         return { ...fw, rawData: { ...rawData, goals: updatedGoals } };
       });
 
       set({ session: { ...session, frameworks: updatedFrameworks } });
     },
 
-    // ---- Confused Mode Actions ----
     addConfusedMessage: (role, content) => {
-      set((state) => ({
-        confusedMessages: [...state.confusedMessages, { role, content }],
-      }));
+      set((state) => ({ confusedMessages: [...state.confusedMessages, { role, content }] }));
     },
+
     addGreetingMessage: () => {
       const { confusedMessages } = get();
       if (confusedMessages.length === 0) {
@@ -380,56 +313,61 @@ export const usePTStore = create<PTStoreState>()(
         });
       }
     },
+
     resetConfusedMessages: () => {
       set({ confusedMessages: [] });
       PTStorage.clearConfusedMessages();
     },
+
     clearConfusedSession: () => {
       set({ confusedMessages: [] });
       PTStorage.clearConfusedMessages();
     },
 
-    // ---- Auth Actions ----
-
     initializeAuth: async () => {
       const token = PTStorage.getToken();
       const user = PTStorage.getUser();
+      const hasOnboarded = PTStorage.load<boolean>(PTStorage.KEYS.ONBOARDED) || false;
+      set({ hasCompletedOnboarding: hasOnboarded });
+
       if (token && user) {
         set({ token, user, isAuthenticated: true });
-        // Optionally verify token with /auth/me
         try {
           const freshUser = await API.get<any>('/auth/me');
           set({ user: freshUser, isAuthenticated: true });
           PTStorage.saveUser(freshUser);
         } catch (e) {
-          get().logout();
+          set({ token: null, user: null, isAuthenticated: false });
+          PTStorage.clearAuth();
         }
       }
+      set({ isAuthHydrated: true });
     },
 
     login: async (email, password) => {
+      if (get().isLoading) return { success: false };
+      set({ isLoading: true, error: null });
       try {
         const res = await API.post<any>('/auth/login', { email, password });
-        set({
-          token: res.token,
-          user: res.user,
-          isAuthenticated: true
-        });
+        set({ token: res.token, user: res.user, isAuthenticated: true, isLoading: false });
         PTStorage.saveToken(res.token);
         PTStorage.saveUser(res.user);
         return { success: true };
       } catch (e: any) {
+        set({ isLoading: false, error: e.message });
         return { success: false, error: e.message };
       }
     },
 
     register: async (name, email, password) => {
+      if (get().isLoading) return { success: false };
+      set({ isLoading: true, error: null });
       try {
         await API.post<any>('/auth/register', { name, email, password });
-        // Auto login or redirect? Requirement says "auto login OR redirect"
-        // Let's do a quick login after register for better UX
+        set({ isLoading: false });
         return get().login(email, password);
       } catch (e: any) {
+        set({ isLoading: false, error: e.message });
         return { success: false, error: e.message };
       }
     },
@@ -439,11 +377,184 @@ export const usePTStore = create<PTStoreState>()(
       PTStorage.clearAuth();
     },
 
-    generateFrameworkTasks: async (frameworkId) => {
-      const { session } = get();
-      if (!session) return { success: false, error: 'No active session' };
+    fetchLatestSession: async () => {
+      const { isAuthenticated, isLoading } = get();
+      if (!isAuthenticated || isLoading) return;
 
-      set({ isLoading: true });
+      set({ isLoading: true, error: null });
+      try {
+        const sessions = await API.get<any[]>('/sessions');
+        if (sessions.length > 0) {
+          const latest = sessions[0];
+          set({ session: latest.data, hasCompletedOnboarding: true, isLoading: false });
+          PTStorage.saveSession(latest.data);
+          PTStorage.save(PTStorage.KEYS.ONBOARDED, true);
+        } else {
+          set({ isLoading: false });
+        }
+      } catch (e) {
+        set({ isLoading: false });
+      }
+    },
+
+    setHasCompletedOnboarding: (val) => {
+      set({ hasCompletedOnboarding: val });
+      PTStorage.save(PTStorage.KEYS.ONBOARDED, val);
+    },
+
+    addTask: (taskData) => {
+      const { session, isAuthenticated } = get();
+      if (!session) return;
+
+      const newTask: Task = {
+        id: `task-${Date.now()}`,
+        title: taskData.title || 'Untitled Task',
+        description: taskData.description || '',
+        priority: taskData.priority || 'medium',
+        category: taskData.category || 'General',
+        estimatedMinutes: taskData.estimatedMinutes || 30,
+        isCompleted: false,
+        framework: 'gtd',
+        subtasks: [],
+        ...taskData,
+      };
+
+      const updatedSession = { ...session, masterTaskList: [newTask, ...session.masterTaskList] };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+      
+      if (isAuthenticated) {
+        API.post('/sessions', {
+          id: updatedSession.sessionId,
+          session_date: new Date().toLocaleDateString('en-CA'),
+          raw_story: updatedSession.story.rawText,
+          data: updatedSession
+        }).catch(err => console.error('Failed to sync added task:', err));
+      }
+    },
+
+    editTask: (taskId, updates) => {
+      const { session, isAuthenticated } = get();
+      if (!session) return;
+
+      const updatedList = session.masterTaskList.map(t => t.id === taskId ? { ...t, ...updates } : t);
+      const updatedSession = { ...session, masterTaskList: updatedList };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+
+      if (isAuthenticated) {
+        API.post('/sessions', {
+          id: updatedSession.sessionId,
+          session_date: new Date().toLocaleDateString('en-CA'),
+          raw_story: updatedSession.story.rawText,
+          data: updatedSession
+        }).catch(err => console.error('Failed to sync edited task:', err));
+      }
+    },
+
+    deleteTask: (taskId) => {
+      const { session, isAuthenticated } = get();
+      if (!session) return;
+
+      const updatedList = session.masterTaskList.filter(t => t.id !== taskId);
+      const updatedSession = { ...session, masterTaskList: updatedList };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+
+      if (isAuthenticated) {
+        API.post('/sessions', {
+          id: updatedSession.sessionId,
+          session_date: new Date().toLocaleDateString('en-CA'),
+          raw_story: updatedSession.story.rawText,
+          data: updatedSession
+        }).catch(err => console.error('Failed to sync deleted task:', err));
+      }
+    },
+
+    generateSubtasks: async (taskId) => {
+      const { session, isAuthenticated, isLoading } = get();
+      if (!session || isLoading) return;
+
+      const task = session.masterTaskList.find(t => t.id === taskId);
+      if (!task) return;
+
+      set({ isLoading: true, error: null });
+      try {
+        const res = await API.post<any>('/api/generate-subtasks', {
+          taskId,
+          taskTitle: task.title,
+          context: session.story.rawText
+        });
+
+        if (res.success && res.subtasks) {
+          const updatedList = session.masterTaskList.map(t => t.id === taskId ? { ...t, subtasks: res.subtasks } : t);
+          const updatedSession = { ...session, masterTaskList: updatedList };
+          set({ session: updatedSession, isLoading: false });
+          PTStorage.saveSession(updatedSession);
+
+          if (isAuthenticated) {
+            API.post('/sessions', {
+              id: updatedSession.sessionId,
+              session_date: new Date().toLocaleDateString('en-CA'),
+              raw_story: updatedSession.story.rawText,
+              data: updatedSession
+            }).catch(err => console.error('Failed to sync generated subtasks:', err));
+          }
+        } else {
+          set({ isLoading: false, error: 'Failed to generate subtasks' });
+        }
+      } catch (e) {
+        set({ isLoading: false, error: 'Moti is sleeping. Try again later.' });
+      }
+    },
+
+    addMoreTasks: async () => {
+      const { session, isAuthenticated, isLoading } = get();
+      if (!session || isLoading) return;
+
+      set({ isLoading: true, error: null });
+      try {
+        const res = await API.post<any>('/api/add-more-tasks', {
+          sessionId: session.sessionId,
+          existingTasks: session.masterTaskList,
+          storyContext: session.story.rawText
+        });
+
+        if (res.success && res.newTasks) {
+          const newTasks = parseTasks(res.newTasks, 'gtd');
+          const existingIds = new Set(session.masterTaskList.map(t => t.id));
+          const uniqueNewTasks = newTasks.filter((t: Task) => !existingIds.has(t.id));
+
+          if (uniqueNewTasks.length === 0) {
+             set({ isLoading: false, error: 'Moti tidak menemukan task baru yang relevan.' });
+             return;
+          }
+
+          const updatedSession = { ...session, masterTaskList: [...session.masterTaskList, ...uniqueNewTasks] };
+          set({ session: updatedSession, isLoading: false });
+          PTStorage.saveSession(updatedSession);
+
+          if (isAuthenticated) {
+            API.post('/sessions', {
+              id: updatedSession.sessionId,
+              session_date: new Date().toLocaleDateString('en-CA'),
+              raw_story: updatedSession.story.rawText,
+              data: updatedSession
+            }).catch(err => console.error('Failed to sync added tasks:', err));
+          }
+        } else {
+          set({ isLoading: false, error: res.error || 'Failed to find more tasks.' });
+        }
+      } catch (e) {
+        set({ isLoading: false, error: 'Moti is tired. Try again later.' });
+      }
+    },
+
+    generateFrameworkTasks: async (frameworkId) => {
+      const { session, isLoading } = get();
+      if (!session || isLoading) return { success: false, error: 'Already loading or no session' };
+
+      set({ isLoading: true, error: null });
       try {
         const res = await API.post<any>('/api/generate-framework-tasks', {
           frameworkId,
@@ -452,11 +563,9 @@ export const usePTStore = create<PTStoreState>()(
         });
         
         if (res.success && res.data) {
-          // Update the session in store with new framework data
           const updatedFrameworks = session.frameworks.map(fw => 
             fw.frameworkId === frameworkId ? { ...fw, rawData: res.data.data } : fw
           );
-          
           const updatedSession = { ...session, frameworks: updatedFrameworks };
           set({ session: updatedSession, isLoading: false });
           PTStorage.saveSession(updatedSession);
@@ -471,7 +580,6 @@ export const usePTStore = create<PTStoreState>()(
   })),
 );
 
-// Middleware untuk auto-save session dan confusedMessages ke localStorage setiap berubah
 usePTStore.subscribe(
   (state) => ({ session: state.session, confusedMessages: state.confusedMessages }),
   (current) => {
@@ -485,26 +593,18 @@ usePTStore.subscribe(
   { equalityFn: (a, b) => a.session === b.session && a.confusedMessages === b.confusedMessages }
 );
 
-/* ---- Selectors (untuk cleaner component code) ---- */
-
+/* ---- Selectors ---- */
 export const selectSession     = (s: PTStoreState) => s.session;
 export const selectIsLoading   = (s: PTStoreState) => s.isLoading;
 export const selectError       = (s: PTStoreState) => s.error;
-export const selectTopFramework = (s: PTStoreState) =>
-  s.session?.topRecommendation ?? null;
-export const selectTodayPlan   = (s: PTStoreState) =>
-  s.session?.todayPlan ?? [];
-export const selectMasterTasks = (s: PTStoreState) =>
-  s.session?.masterTaskList ?? [];
+export const selectTopFramework = (s: PTStoreState) => s.session?.topRecommendation ?? null;
+export const selectTodayPlan   = (s: PTStoreState) => s.session?.todayPlan ?? [];
+export const selectMasterTasks = (s: PTStoreState) => s.session?.masterTaskList ?? [];
 export const selectToggleTask  = (s: PTStoreState) => s.toggleTask;
 export const selectMoveKanbanCard = (s: PTStoreState) => s.moveKanbanCard;
 export const selectUpdateKRProgress = (s: PTStoreState) => s.updateKRProgress;
 export const selectUpdateGoalProgress = (s: PTStoreState) => s.updateGoalProgress;
 
-/* ---- Hook: useFramework (convenience) ---- */
-
 export function useFramework(frameworkId: string) {
-  return usePTStore((state) =>
-    state.session?.frameworks.find((f) => f.frameworkId === frameworkId) ?? null,
-  );
+  return usePTStore((state) => state.session?.frameworks.find((f) => f.frameworkId === frameworkId) ?? null);
 }

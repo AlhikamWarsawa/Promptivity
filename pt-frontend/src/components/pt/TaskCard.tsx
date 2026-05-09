@@ -19,6 +19,9 @@ import type { Task }               from '@/types/pt.types';
 interface TaskCardProps {
   task:       Task;
   onToggle?:  (id: string) => void;
+  onEdit?:    (task: Task) => void;
+  onDelete?:  (id: string) => void;
+  onAskMoti?: (id: string) => void;
   className?: string;
   compact?:   boolean;    // Compact mode untuk list panjang
 }
@@ -26,6 +29,9 @@ interface TaskCardProps {
 export function TaskCard({
   task,
   onToggle,
+  onEdit,
+  onDelete,
+  onAskMoti,
   className,
   compact = false,
 }: TaskCardProps) {
@@ -143,46 +149,82 @@ export function TaskCard({
           </p>
         )}
 
-        {/* Meta row */}
-        <div className="flex flex-wrap items-center gap-2 mt-2">
-          {/* Time estimate */}
-          <span
-            className="inline-flex items-center gap-1 text-[11px] font-semibold"
-            style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
-          >
-            <ClockIcon />
-            {formatDuration(task.estimatedMinutes)}
-          </span>
-
-          {/* Category */}
-          {task.category && task.category !== 'general' && (
-            <span
-              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border border-pt-black/20"
-              style={{
-                fontFamily:      'var(--font-body)',
-                color:           'var(--pt-black)',
-                backgroundColor: getCategoryBg(task.category),
-              }}
+        {/* Subtasks */}
+        <AnimatePresence>
+          {!compact && task.subtasks && task.subtasks.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="mt-3 pl-2 border-l-2 border-pt-black/10 space-y-1.5 overflow-hidden"
             >
-              {task.category}
-            </span>
+              {task.subtasks.map((sub: string, idx: number) => (
+                <div key={idx} className="flex items-center gap-2 text-xs" style={{ fontFamily: 'var(--font-body)', color: '#4B4B4B' }}>
+                  <span className="text-pt-blue font-bold">↳</span>
+                  <span className={isCompleted ? 'line-through opacity-50' : ''}>{sub}</span>
+                </div>
+              ))}
+            </motion.div>
           )}
+        </AnimatePresence>
 
-          {/* Deadline */}
-          {task.deadline && (
+        {/* Meta row */}
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Time estimate */}
             <span
               className="inline-flex items-center gap-1 text-[11px] font-semibold"
-              style={{
-                fontFamily: 'var(--font-body)',
-                color:      isDeadlineSoon(task.deadline)
-                  ? 'var(--pt-coral)'
-                  : '#6B6B6B',
-              }}
+              style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
             >
-              <CalendarIcon />
-              {task.deadline}
+              <ClockIcon />
+              {formatDuration(task.estimatedMinutes)}
             </span>
-          )}
+
+            {/* Category */}
+            {task.category && task.category !== 'general' && (
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border border-pt-black/20"
+                style={{
+                  fontFamily:      'var(--font-body)',
+                  color:           'var(--pt-black)',
+                  backgroundColor: getCategoryBg(task.category),
+                }}
+              >
+                {task.category}
+              </span>
+            )}
+          </div>
+
+          {/* Action buttons — show on hover on desktop, always on mobile */}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 lg:group-hover:opacity-100 transition-opacity">
+            {onAskMoti && !isCompleted && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onAskMoti(task.id); }}
+                className="p-1.5 hover:bg-pt-yellowP rounded-full transition-colors text-pt-brown"
+                title="Ask Moti to break this down"
+              >
+                <SparklesIcon size={16} />
+              </button>
+            )}
+            {onEdit && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+                className="p-1.5 hover:bg-pt-blue/10 rounded-full transition-colors text-pt-black/60 hover:text-pt-blue"
+                title="Edit Task"
+              >
+                <EditIcon size={16} />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+                className="p-1.5 hover:bg-pt-coral/10 rounded-full transition-colors text-pt-black/60 hover:text-pt-coral"
+                title="Delete Task"
+              >
+                <TrashIcon size={16} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -192,10 +234,11 @@ export function TaskCard({
 /* ---- Helper functions ---- */
 
 function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return `${minutes} min`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m > 0 ? `${h}j ${m}m` : `${h}j`;
+  const hLabel = h === 1 ? 'hour' : 'hours';
+  return m > 0 ? `${h} ${hLabel} ${m} min` : `${h} ${hLabel}`;
 }
 
 function getCategoryBg(category: string): string {
@@ -234,6 +277,34 @@ function CalendarIcon() {
     <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
       <rect x="1" y="2" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
       <path d="M1 5h10M4 1v2M8 1v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function SparklesIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12 3 1.912 4.912L18.824 9.824 13.912 11.736 12 16.648l-1.912-4.912L5.176 9.824l4.912-1.912L12 3Z" />
+      <path d="M5 3v4" /><path d="M19 17v4" /><path d="M3 5h4" /><path d="M17 19h4" />
+    </svg>
+  );
+}
+
+function EditIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
+function TrashIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
     </svg>
   );
 }

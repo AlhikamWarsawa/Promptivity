@@ -82,9 +82,8 @@ export interface PTStoreState {
   reorderPomodoroTasks: (newTasks: any[]) => void;
   addMorePomodoroTasks: () => Promise<void>;
   completePomodoroSession: (taskId: string) => void;
-  logPomodoroInterruption: (taskId: string, type: 'internal' | 'external', note?: string) => void;
-  savePomodoroReflection: (reflection: { wentWell: string; distractions: string; improvements: string }) => void;
-  updatePomodoroStats: (minutes: number, isBreak: boolean) => void;
+  logPomodoroDistraction: (taskId: string, note: string) => void;
+  skipPomodoroSession: (taskId: string) => void;
 }
 
 /* ---- Store Implementation ---- */
@@ -603,11 +602,8 @@ export const usePTStore = create<PTStoreState>()(
           duration: taskData.duration || 25,
           breakDuration: taskData.breakDuration || 5,
           sessions: taskData.sessions || 1,
-          bufferSessions: (taskData as any).bufferSessions || 0,
           completedSessions: 0,
           isCompleted: false,
-          presetName: (taskData as any).presetName || 'standard',
-          interruptionLog: [],
         };
         return { ...fw, rawData: { ...rawData, tasks: [...(rawData.tasks || []), newTask] } };
       });
@@ -746,7 +742,7 @@ export const usePTStore = create<PTStoreState>()(
       PTStorage.saveSession(updatedSession);
     },
 
-    logPomodoroInterruption: (taskId, type, note) => {
+    logPomodoroDistraction: (taskId, note) => {
       const { session } = get();
       if (!session) return;
       const updatedFrameworks = session.frameworks.map((fw) => {
@@ -754,8 +750,13 @@ export const usePTStore = create<PTStoreState>()(
         const rawData = fw.rawData as any;
         const updatedTasks = (rawData.tasks || []).map((t: any) => {
           if (t.id === taskId) {
-            const newLog = [...(t.interruptionLog || []), { id: `int-${Date.now()}`, timestamp: Date.now(), type, note }];
-            return { ...t, interruptionLog: newLog };
+            const distractions = t.distractions || [];
+            const count = (t.distractionCount || 0) + 1;
+            return { 
+              ...t, 
+              distractionCount: count,
+              distractions: [...distractions, { timestamp: new Date().toISOString(), note }]
+            };
           }
           return t;
         });
@@ -766,32 +767,23 @@ export const usePTStore = create<PTStoreState>()(
       PTStorage.saveSession(updatedSession);
     },
 
-    savePomodoroReflection: (reflectionData) => {
+    skipPomodoroSession: (taskId) => {
       const { session } = get();
       if (!session) return;
       const updatedFrameworks = session.frameworks.map((fw) => {
         if (fw.frameworkId !== 'pomodoro') return fw;
         const rawData = fw.rawData as any;
-        const newReflection = { ...reflectionData, date: new Date().toLocaleDateString() };
-        const updatedReflections = [...(rawData.reflections || []), newReflection];
-        return { ...fw, rawData: { ...rawData, reflections: updatedReflections } };
-      });
-      const updatedSession = { ...session, frameworks: updatedFrameworks };
-      set({ session: updatedSession });
-      PTStorage.saveSession(updatedSession);
-    },
-
-    updatePomodoroStats: (minutes, isBreak) => {
-      const { session } = get();
-      if (!session) return;
-      const updatedFrameworks = session.frameworks.map((fw) => {
-        if (fw.frameworkId !== 'pomodoro') return fw;
-        const rawData = fw.rawData as any;
-        if (isBreak) {
-          return { ...fw, rawData: { ...rawData, totalBreakMinutes: (rawData.totalBreakMinutes || 0) + minutes } };
-        } else {
-          return { ...fw, rawData: { ...rawData, totalFocusMinutes: (rawData.totalFocusMinutes || 0) + minutes } };
-        }
+        const updatedTasks = (rawData.tasks || []).map((t: any) => {
+          if (t.id === taskId) {
+            // Skips increment completedSessions but doesn't count towards productivity metrics if we had them
+            // For now, it just advances the queue.
+            const nextCompleted = (t.completedSessions || 0) + 1;
+            const isFullyDone = nextCompleted >= t.sessions;
+            return { ...t, completedSessions: nextCompleted, isCompleted: isFullyDone };
+          }
+          return t;
+        });
+        return { ...fw, rawData: { ...rawData, tasks: updatedTasks } };
       });
       const updatedSession = { ...session, frameworks: updatedFrameworks };
       set({ session: updatedSession });

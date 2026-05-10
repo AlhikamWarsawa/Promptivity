@@ -1,4 +1,4 @@
 g:
 	git add .
-	git commit -m "Fix Readme"
+	git commit -m "Pomodoro"
 	git push

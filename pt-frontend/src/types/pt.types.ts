@@ -103,10 +103,13 @@ export interface EatTheFrogData {
 }
 
 export interface PomodoroData {
-  sessions: {
-    task: string;
-    pomodoroCount: number;
-    estimatedMinutes: number;
+  tasks: {
+    id: string;
+    title: string;
+    duration: number;
+    breakDuration: number;
+    sessions: number;
+    isCompleted?: boolean;
   }[];
 }
 

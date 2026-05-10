@@ -11,6 +11,8 @@ BASE_RULES = """
 2. GROUNDING: Extract only what is explicitly stated or clearly implied.
 3. LANGUAGE: Detect the user's primary input language and generate ALL outputs in the same language (Bahasa Indonesia or English). Do not mix languages unless intentionally used by the user.
 4. ACTIONABILITY: Every task title starts with a verb.
+5. TASK COUNT: Always return at least 3 tasks and at most 8 tasks for every framework.
+6. VAGUE INPUT: If user input is vague, infer practical starter tasks from the framework's core philosophy.
 """
 
 # --- Dashboard Prompt ---
@@ -79,7 +81,7 @@ You are Moti. Build a deep-dive plan for the specified framework based on the us
 - kanban: {{ "backlog": [], "inProgress": [], "done": [] }}
 - time-blocking: {{ "schedule": [{{ "time": "HH:MM", "task": "", "duration": 60, "category": "work", "priority": "medium" }}] }}
 - eat-the-frog: {{ "frog": {{ "title": "", "reason": "", "estimatedMinutes": 90, "priority": "critical", "category": "work" }}, "secondaryTasks": [] }}
-- pomodoro: {{ "sessions": [{{ "task": "", "pomodoroCount": 2, "estimatedMinutes": 50, "priority": "high", "category": "work" }}] }}
+- pomodoro: {{ "tasks": [{{ "title": "", "duration": 25, "breakDuration": 5, "sessions": 2 }}] }}
 - eisenhower: {{ "doNow": [], "schedule": [], "delegate": [], "eliminate": [] }}
 - systemist: {{ "morning": [], "workTasks": [], "evening": [], "recurring": [] }}
 - medium-method: {{ "days": [{{ "label": "Hari Ini", "mainTask": {{}}, "supportTasks": [] }}] }}
@@ -98,8 +100,10 @@ Output language MUST match the user's input language.
 - If energyPattern is "night", productive blocks should be afternoon/evening.
 - If preferredStyle is "structured", task descriptions should be more precise.
 
-## TODAY ACTIONS (REQUIRED)
-In addition to the framework data, always return "todayActions": ["<action 1>", "<action 2>"] specific to this framework.
+## TASK REQUIREMENTS
+- Every framework page MUST have at least 3 actionable tasks.
+- Maximum 8 tasks.
+- If the user story doesn't provide enough details, generate practical starter actions relevant to the framework (e.g., "Clarify today's top priority" or "Set up environment").
 
 ## FINAL JSON OUTPUT STRUCTURE
 {{

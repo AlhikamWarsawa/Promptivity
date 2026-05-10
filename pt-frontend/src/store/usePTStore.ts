@@ -73,6 +73,14 @@ export interface PTStoreState {
   deleteTask: (taskId: string) => void;
   generateSubtasks: (taskId: string) => Promise<void>;
   addMoreTasks: () => Promise<void>;
+
+  // Pomodoro Specific Actions
+  addPomodoroTask: (task: Partial<{ title: string; duration: number; breakDuration: number; sessions: number }>) => void;
+  editPomodoroTask: (taskId: string, updates: Partial<{ title: string; duration: number; breakDuration: number; sessions: number }>) => void;
+  deletePomodoroTask: (taskId: string) => void;
+  togglePomodoroTask: (taskId: string) => void;
+  reorderPomodoroTasks: (newTasks: any[]) => void;
+  addMorePomodoroTasks: () => Promise<void>;
 }
 
 /* ---- Store Implementation ---- */
@@ -576,7 +584,138 @@ export const usePTStore = create<PTStoreState>()(
         set({ isLoading: false, error: e.message });
         return { success: false, error: e.message };
       }
+    },
+
+    // Pomodoro Specific Actions
+    addPomodoroTask: (taskData) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        const newTask = {
+          id: `pomodoro-${Date.now()}`,
+          title: taskData.title || 'Focus session',
+          duration: taskData.duration || 25,
+          breakDuration: taskData.breakDuration || 5,
+          sessions: taskData.sessions || 1,
+          isCompleted: false,
+        };
+        return { ...fw, rawData: { ...rawData, tasks: [...(rawData.tasks || []), newTask] } };
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    editPomodoroTask: (taskId, updates) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        const updatedTasks = (rawData.tasks || []).map((t: any) => 
+          t.id === taskId ? { ...t, ...updates } : t
+        );
+        return { ...fw, rawData: { ...rawData, tasks: updatedTasks } };
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    deletePomodoroTask: (taskId) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        const updatedTasks = (rawData.tasks || []).filter((t: any) => t.id !== taskId);
+        return { ...fw, rawData: { ...rawData, tasks: updatedTasks } };
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    togglePomodoroTask: (taskId) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        const updatedTasks = (rawData.tasks || []).map((t: any) => 
+          t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t
+        );
+        return { ...fw, rawData: { ...rawData, tasks: updatedTasks } };
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    reorderPomodoroTasks: (newTasks) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        return { ...fw, rawData: { ...rawData, tasks: newTasks } };
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    addMorePomodoroTasks: async () => {
+      const { session, isLoading } = get();
+      if (!session || isLoading) return;
+
+      set({ isLoading: true, error: null });
+      try {
+        const fw = session.frameworks.find(f => f.frameworkId === 'pomodoro');
+        const existingTasks = fw ? ((fw.rawData as any).tasks || []) : [];
+        // Map them to look like generic tasks for the backend
+        const mappedExisting = existingTasks.map((t: any) => ({
+          title: t.title,
+          estimatedMinutes: t.duration * t.sessions,
+        }));
+
+        const res = await API.post<any>('/api/add-more-tasks', {
+          sessionId: session.sessionId,
+          existingTasks: mappedExisting,
+          storyContext: session.story.rawText
+        });
+
+        if (res.success && res.newTasks) {
+          const newGenericTasks = parseTasks(res.newTasks, 'pomodoro'); // This just ensures it's parsed securely as generic Task[]
+          
+          const newPomTasks = newGenericTasks.map((t: Task, idx: number) => ({
+            id: `pomodoro-new-${Date.now()}-${idx}`,
+            title: t.title,
+            duration: 25,
+            breakDuration: 5,
+            sessions: Math.max(1, Math.ceil((t.estimatedMinutes || 25) / 25)),
+            isCompleted: false,
+          }));
+
+          const updatedFrameworks = session.frameworks.map((fw) => {
+            if (fw.frameworkId !== 'pomodoro') return fw;
+            const rawData = fw.rawData as any;
+            return { ...fw, rawData: { ...rawData, tasks: [...(rawData.tasks || []), ...newPomTasks] } };
+          });
+
+          const updatedSession = { ...session, frameworks: updatedFrameworks };
+          set({ session: updatedSession, isLoading: false });
+          PTStorage.saveSession(updatedSession);
+        } else {
+          set({ isLoading: false, error: res.error || 'Failed to generate more tasks.' });
+        }
+      } catch (e) {
+        set({ isLoading: false, error: 'Moti is tired. Try again later.' });
+      }
     }
+
   })),
 );
 
@@ -604,6 +743,13 @@ export const selectToggleTask  = (s: PTStoreState) => s.toggleTask;
 export const selectMoveKanbanCard = (s: PTStoreState) => s.moveKanbanCard;
 export const selectUpdateKRProgress = (s: PTStoreState) => s.updateKRProgress;
 export const selectUpdateGoalProgress = (s: PTStoreState) => s.updateGoalProgress;
+
+export const selectAddPomodoroTask = (s: PTStoreState) => s.addPomodoroTask;
+export const selectEditPomodoroTask = (s: PTStoreState) => s.editPomodoroTask;
+export const selectDeletePomodoroTask = (s: PTStoreState) => s.deletePomodoroTask;
+export const selectTogglePomodoroTask = (s: PTStoreState) => s.togglePomodoroTask;
+export const selectReorderPomodoroTasks = (s: PTStoreState) => s.reorderPomodoroTasks;
+export const selectAddMorePomodoroTasks = (s: PTStoreState) => s.addMorePomodoroTasks;
 
 export function useFramework(frameworkId: string) {
   return usePTStore((state) => state.session?.frameworks.find((f) => f.frameworkId === frameworkId) ?? null);

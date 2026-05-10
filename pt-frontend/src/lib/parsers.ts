@@ -122,18 +122,31 @@ export function parseFrameworkOutput(
   const obj = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
 
   // Extract tasks from various possible locations in raw data
-  const tasks = parseTasks(
+  let tasks = parseTasks(
     obj.tasks ??
     obj.nextActions ??
     obj.backlog ??
     obj.workTasks ??
-    obj.sessions ??
     [],
     frameworkId,
   );
 
   // Parse rawData — framework-specific fields
   const rawData = parseFrameworkRawData(frameworkId, obj) as FrameworkRawData;
+
+  // Fallback: If no tasks extracted, try to find them in rawData (e.g. PARA projects)
+  if (tasks.length === 0) {
+    if (frameworkId === 'para' && 'projects' in rawData) {
+      tasks = (rawData as any).projects.flatMap((p: any) => p.tasks || []);
+    } else if (frameworkId === 'gtd' && 'projects' in rawData) {
+      tasks = (rawData as any).projects.flatMap((p: any) => p.tasks || []);
+    }
+  }
+
+  // Final Safety Net: If still empty, use hardcoded fallbacks
+  if (tasks.length === 0) {
+    tasks = getFrameworkFallbacks(frameworkId);
+  }
 
   return {
     frameworkId,
@@ -149,6 +162,28 @@ export function parseFrameworkOutput(
     ),
     rawData,
   };
+}
+
+/**
+ * Returns a set of fallback tasks specific to a framework
+ */
+function getFrameworkFallbacks(frameworkId: FrameworkId): Task[] {
+  const genericTasks = [
+    { title: "Define your primary objective for today", priority: 'high', estimatedMinutes: 15 },
+    { title: "Break down your biggest goal into smaller actions", priority: 'medium', estimatedMinutes: 30 },
+    { title: "Review current progress and obstacles", priority: 'low', estimatedMinutes: 20 },
+  ];
+
+  return genericTasks.map((t, i) => ({
+    id: `fallback_${frameworkId}_${i}`,
+    title: t.title,
+    description: 'Auto-generated starter task.',
+    priority: t.priority as Priority,
+    estimatedMinutes: t.estimatedMinutes,
+    category: 'general',
+    isCompleted: false,
+    framework: frameworkId,
+  }));
 }
 
 /* ============================================
@@ -226,14 +261,15 @@ function parseFrameworkRawData(
 
     case 'pomodoro':
       return {
-        sessions: safeArr(obj.sessions).map((s: unknown) => {
+        tasks: safeArr(obj.tasks).map((s: unknown, index: number) => {
           const sess = (s as Record<string, unknown>) ?? {};
           return {
-            task:             safeStr(sess.task, 'Focus session'),
-            pomodoroCount:    safeNum(sess.pomodoroCount, 2, 1, 10),
-            estimatedMinutes: safeNum(sess.estimatedMinutes, 50, 25, 300),
-            priority:         safePriority(sess.priority),
-            category:         safeStr(sess.category, 'work'),
+            id:            safeStr(sess.id, `pomodoro-${index}-${Date.now()}`),
+            title:         safeStr(sess.title || sess.task, 'Focus session'),
+            duration:      safeNum(sess.duration, 25, 5, 120),
+            breakDuration: safeNum(sess.breakDuration, 5, 2, 30),
+            sessions:      safeNum(sess.sessions || sess.pomodoroCount, 2, 1, 10),
+            isCompleted:   !!sess.isCompleted,
           };
         }),
       };

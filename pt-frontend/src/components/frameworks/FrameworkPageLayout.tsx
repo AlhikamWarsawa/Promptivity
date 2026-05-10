@@ -110,7 +110,6 @@ export function FrameworkPageLayout({
           </div>
         )}
 
-        <Link href="/onboarding/brain-dump" className="ml-auto sm:ml-2 text-label font-bold underline">✍️ Cerita Baru</Link>
       </motion.header>
 
       <section className="px-4 sm:px-6 py-10" style={{ background: `linear-gradient(135deg, ${meta.accentColor}18 0%, var(--pt-white) 60%)`, borderBottom: '2px solid var(--pt-black)' }}>

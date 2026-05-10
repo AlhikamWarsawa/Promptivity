@@ -166,15 +166,141 @@ class GeminiService:
         parsed = self._extract_json(response_text)
         data = json.loads(parsed)
         
+        # --- Task Validation & Fallback ---
+        framework_data = data.get("data", {})
+        total_tasks = self._count_total_tasks(framework_id, framework_data)
+        
+        if total_tasks < 3:
+            self._inject_fallback_tasks(framework_id, framework_data, 3 - total_tasks)
+        
         result = {
             "frameworkId":  framework_id,
-            "rawData":      data.get("data", {}),
+            "rawData":      framework_data,
             "todayActions": data.get("todayActions", []),
             "tasks":        [], 
         }
         
         self._cache_framework(session_id, framework_id, result)
         return result
+
+    def _count_total_tasks(self, framework_id: str, data: dict) -> int:
+        """Count all actionable tasks/items within the framework structure."""
+        count = 0
+        try:
+            if framework_id == 'gtd':
+                count += len(data.get('nextActions', []))
+                for p in data.get('projects', []):
+                    count += len(p.get('tasks', []))
+            elif framework_id == 'kanban':
+                count += len(data.get('backlog', []))
+                count += len(data.get('inProgress', []))
+            elif framework_id == 'time-blocking':
+                count += len(data.get('schedule', []))
+            elif framework_id == 'eat-the-frog':
+                if data.get('frog'): count += 1
+                count += len(data.get('secondaryTasks', []))
+            elif framework_id == 'pomodoro':
+                count += len(data.get('tasks', []))
+            elif framework_id == 'eisenhower':
+                count += len(data.get('doNow', []))
+                count += len(data.get('schedule', []))
+                count += len(data.get('delegate', []))
+            elif framework_id == 'systemist':
+                count += len(data.get('workTasks', []))
+                count += len(data.get('recurring', []))
+            elif framework_id == 'medium-method':
+                for d in data.get('days', []):
+                    if d.get('mainTask'): count += 1
+                    count += len(d.get('supportTasks', []))
+            elif framework_id == 'okrs':
+                count += len(data.get('keyResults', []))
+            elif framework_id == 'weekly-review':
+                count += len(data.get('nextWeekFocus', []))
+            elif framework_id == 'commitment-inventory':
+                count += len(data.get('commitments', []))
+            elif framework_id == 'smart-goals':
+                count += len(data.get('goals', []))
+            elif framework_id == 'para':
+                for p in data.get('projects', []):
+                    count += len(p.get('tasks', []))
+            elif framework_id == 'deep-work':
+                count += len(data.get('deepBlocks', []))
+                count += len(data.get('shallowTasks', []))
+            elif framework_id == 'pareto':
+                count += len(data.get('highImpact', []))
+                count += len(data.get('maintenance', []))
+        except Exception:
+            pass
+        return count
+
+    def _inject_fallback_tasks(self, framework_id: str, data: dict, needed: int):
+        """Inject generic but helpful tasks into the framework structure."""
+        fallbacks = [
+            {"title": "Clarify today's top priority", "priority": "high", "estimatedMinutes": 15, "category": "General"},
+            {"title": "Break main goal into smaller steps", "priority": "medium", "estimatedMinutes": 30, "category": "General"},
+            {"title": "Schedule a focused work session", "priority": "high", "estimatedMinutes": 60, "category": "Deep Work"},
+            {"title": "Review and organize current backlog", "priority": "low", "estimatedMinutes": 20, "category": "Admin"},
+            {"title": "Identify next immediate action", "priority": "critical", "estimatedMinutes": 10, "category": "General"}
+        ]
+        
+        # Take only what is needed
+        to_add = fallbacks[:needed]
+        
+        # Simple injection mapping
+        try:
+            if framework_id == 'gtd':
+                data.setdefault('nextActions', []).extend(to_add)
+            elif framework_id == 'kanban':
+                data.setdefault('backlog', []).extend(to_add)
+            elif framework_id == 'time-blocking':
+                for i, task in enumerate(to_add):
+                    data.setdefault('schedule', []).append({
+                        "time": f"{9 + i}:00", "task": task["title"], "duration": 60, "category": "work", "priority": "medium"
+                    })
+            elif framework_id == 'eat-the-frog':
+                data.setdefault('secondaryTasks', []).extend(to_add)
+            elif framework_id == 'pomodoro':
+                for task in to_add:
+                    data.setdefault('tasks', []).append({
+                        "title": task["title"], "duration": 25, "breakDuration": 5, "sessions": 2
+                    })
+            elif framework_id == 'eisenhower':
+                data.setdefault('doNow', []).extend(to_add)
+            elif framework_id == 'systemist':
+                data.setdefault('workTasks', []).extend(to_add)
+            elif framework_id == 'medium-method':
+                if not data.get('days'):
+                    data['days'] = [{"label": "Hari Ini", "mainTask": to_add[0], "supportTasks": to_add[1:]}]
+                else:
+                    data['days'][0].setdefault('supportTasks', []).extend(to_add)
+            elif framework_id == 'okrs':
+                for task in to_add:
+                    data.setdefault('keyResults', []).append({
+                        "kr": task["title"], "metric": "Completed", "deadline": "Next week", "progress": 0
+                    })
+            elif framework_id == 'weekly-review':
+                data.setdefault('nextWeekFocus', []).extend([t["title"] for t in to_add])
+            elif framework_id == 'commitment-inventory':
+                for task in to_add:
+                    data.setdefault('commitments', []).append({
+                        "name": task["title"], "urgency": "medium", "category": "work", "recommendation": "continue", "reason": "Self-identified priority"
+                    })
+            elif framework_id == 'smart-goals':
+                for task in to_add:
+                    data.setdefault('goals', []).append({
+                        "title": task["title"], "specific": "Actionable step", "measurable": "Done/Not Done", "achievable": "Yes", "relevant": "Core goal", "timeBound": "Today", "progress": 0
+                    })
+            elif framework_id == 'para':
+                if not data.get('projects'):
+                    data['projects'] = [{"name": "Main Mission", "description": "Active goal", "tasks": to_add}]
+                else:
+                    data['projects'][0].setdefault('tasks', []).extend(to_add)
+            elif framework_id == 'deep-work':
+                data.setdefault('shallowTasks', []).extend(to_add)
+            elif framework_id == 'pareto':
+                data.setdefault('highImpact', []).extend(to_add)
+        except Exception:
+            pass
 
     def _parse_and_validate_dashboard(self, json_str: str) -> dict:
         data = json.loads(json_str)

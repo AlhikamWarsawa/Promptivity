@@ -24,7 +24,7 @@ type TimerState = 'idle' | 'running' | 'paused' | 'done';
 
 interface PomodoroTimerProps {
   currentTask?:       string;
-  onSessionComplete?: () => void;
+  onSessionComplete?: (mode: 'work' | 'break') => void;
 }
 
 export function PomodoroTimer({
@@ -35,10 +35,40 @@ export function PomodoroTimer({
   const [state, setState]             = useState<TimerState>('idle');
   const [secondsLeft, setSeconds]     = useState(WORK_SECONDS);
   const [sessionsToday, setSessions]  = useState(0);
+  const [autoMode, setAutoMode]       = useState(false);
+  const [isMuted, setIsMuted]         = useState(false);
+  const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
+  const audioRef                      = useRef<HTMLAudioElement | null>(null);
   const intervalRef                   = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const totalSeconds = mode === 'work' ? WORK_SECONDS : BREAK_SECONDS;
   const progress     = secondsLeft / totalSeconds;
+
+  // Init audio and local storage
+  useEffect(() => {
+    audioRef.current = new Audio('/sounds/timer-ring.wav');
+    setAutoMode(localStorage.getItem('pt-pomodoro-auto') === 'true');
+    setIsMuted(localStorage.getItem('pt-pomodoro-muted') === 'true');
+  }, []);
+
+  const toggleAuto = () => {
+    const next = !autoMode;
+    setAutoMode(next);
+    localStorage.setItem('pt-pomodoro-auto', String(next));
+  };
+
+  const toggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    localStorage.setItem('pt-pomodoro-muted', String(next));
+  };
+
+  const playSound = useCallback(() => {
+    if (!isMuted && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
+  }, [isMuted]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -47,11 +77,25 @@ export function PomodoroTimer({
     };
   }, []);
 
+  // Auto transition countdown
+  useEffect(() => {
+    if (autoCountdown === null) return;
+    if (autoCountdown <= 0) {
+      const nextMode = mode === 'work' ? 'break' : 'work';
+      setMode(nextMode);
+      setSeconds(nextMode === 'work' ? WORK_SECONDS : BREAK_SECONDS);
+      setState('running');
+      setAutoCountdown(null);
+      return;
+    }
+    const timer = setTimeout(() => setAutoCountdown(prev => prev! - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [autoCountdown, mode]);
+
   // Timer tick
   useEffect(() => {
     if (state !== 'running') return;
 
-    // Clear any existing interval before starting a new one
     if (intervalRef.current) clearInterval(intervalRef.current);
 
     intervalRef.current = setInterval(() => {
@@ -60,7 +104,11 @@ export function PomodoroTimer({
           clearInterval(intervalRef.current!);
           setState('done');
           if (mode === 'work') setSessions((s) => s + 1);
-          onSessionComplete?.();
+          playSound();
+          onSessionComplete?.(mode);
+
+          if (autoMode) setAutoCountdown(3);
+
           return 0;
         }
         return prev - 1;
@@ -70,7 +118,7 @@ export function PomodoroTimer({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [state, mode, onSessionComplete]);
+  }, [state, mode, onSessionComplete, autoMode, playSound]);
 
   const start = useCallback(() => setState('running'), []);
   const pause = useCallback(() => {
@@ -130,7 +178,17 @@ export function PomodoroTimer({
         ))}
       </div>
 
-      {/* Current task label */}
+      {/* Current task label & Settings */}
+      <div className="flex justify-between items-center mb-2">
+        <label className="flex items-center gap-1.5 text-xs font-bold cursor-pointer" style={{ color: '#4B4B4B' }}>
+          <input type="checkbox" checked={autoMode} onChange={toggleAuto} className="accent-pt-coral" />
+          Auto Continue
+        </label>
+        <button onClick={toggleMute} className="text-xs font-bold" style={{ color: '#4B4B4B' }}>
+          {isMuted ? '🔇 Muted' : '🔊 Sound On'}
+        </button>
+      </div>
+
       <AnimatePresence mode="wait">
         {currentTask && (
           <motion.p
@@ -146,8 +204,17 @@ export function PomodoroTimer({
         )}
       </AnimatePresence>
 
+      {autoCountdown !== null && (
+        <motion.p 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="text-xs font-bold text-pt-coral mb-2"
+        >
+          Next session in {autoCountdown}...
+        </motion.p>
+      )}
+
       {/* Timer Display Area (Conic Gradient Ring + Center Content) */}
-      <div className="flex justify-center mb-8 mt-4 relative">
+      <div className="flex justify-center mb-8 mt-2 relative">
         <div
           className="relative flex items-center justify-center rounded-full"
           style={{

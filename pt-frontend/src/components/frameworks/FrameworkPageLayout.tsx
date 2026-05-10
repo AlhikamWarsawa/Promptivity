@@ -122,7 +122,7 @@ export function FrameworkPageLayout({
             <h1 className="text-display leading-none" style={{ fontFamily: 'var(--font-display)', color: 'var(--pt-black)' }}>{meta.name}</h1>
             <p className="mt-1 text-sm font-semibold italic" style={{ color: meta.accentColor }}>&ldquo;{meta.tagline}&rdquo;</p>
             
-            {isGenerated && (
+            {isGenerated && frameworkId !== 'pomodoro' && (
               <div className="mt-4">
                 <PTButton
                   variant="outline"

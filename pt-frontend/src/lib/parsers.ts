@@ -269,6 +269,7 @@ function parseFrameworkRawData(
             duration:      safeNum(sess.duration, 25, 5, 120),
             breakDuration: safeNum(sess.breakDuration, 5, 2, 30),
             sessions:      safeNum(sess.sessions || sess.pomodoroCount, 2, 1, 10),
+            completedSessions: safeNum(sess.completedSessions, 0, 0, 10),
             isCompleted:   !!sess.isCompleted,
           };
         }),

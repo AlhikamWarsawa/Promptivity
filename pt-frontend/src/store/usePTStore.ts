@@ -81,6 +81,10 @@ export interface PTStoreState {
   togglePomodoroTask: (taskId: string) => void;
   reorderPomodoroTasks: (newTasks: any[]) => void;
   addMorePomodoroTasks: () => Promise<void>;
+  completePomodoroSession: (taskId: string) => void;
+  logPomodoroInterruption: (taskId: string, type: 'internal' | 'external', note?: string) => void;
+  savePomodoroReflection: (reflection: { wentWell: string; distractions: string; improvements: string }) => void;
+  updatePomodoroStats: (minutes: number, isBreak: boolean) => void;
 }
 
 /* ---- Store Implementation ---- */
@@ -599,7 +603,11 @@ export const usePTStore = create<PTStoreState>()(
           duration: taskData.duration || 25,
           breakDuration: taskData.breakDuration || 5,
           sessions: taskData.sessions || 1,
+          bufferSessions: (taskData as any).bufferSessions || 0,
+          completedSessions: 0,
           isCompleted: false,
+          presetName: (taskData as any).presetName || 'standard',
+          interruptionLog: [],
         };
         return { ...fw, rawData: { ...rawData, tasks: [...(rawData.tasks || []), newTask] } };
       });
@@ -696,6 +704,7 @@ export const usePTStore = create<PTStoreState>()(
             duration: 25,
             breakDuration: 5,
             sessions: Math.max(1, Math.ceil((t.estimatedMinutes || 25) / 25)),
+            completedSessions: 0,
             isCompleted: false,
           }));
 
@@ -714,6 +723,79 @@ export const usePTStore = create<PTStoreState>()(
       } catch (e) {
         set({ isLoading: false, error: 'Moti is tired. Try again later.' });
       }
+    },
+
+    completePomodoroSession: (taskId) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        const updatedTasks = (rawData.tasks || []).map((t: any) => {
+          if (t.id === taskId) {
+            const nextCompleted = (t.completedSessions || 0) + 1;
+            const isFullyDone = nextCompleted >= t.sessions;
+            return { ...t, completedSessions: nextCompleted, isCompleted: isFullyDone };
+          }
+          return t;
+        });
+        return { ...fw, rawData: { ...rawData, tasks: updatedTasks } };
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    logPomodoroInterruption: (taskId, type, note) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        const updatedTasks = (rawData.tasks || []).map((t: any) => {
+          if (t.id === taskId) {
+            const newLog = [...(t.interruptionLog || []), { id: `int-${Date.now()}`, timestamp: Date.now(), type, note }];
+            return { ...t, interruptionLog: newLog };
+          }
+          return t;
+        });
+        return { ...fw, rawData: { ...rawData, tasks: updatedTasks } };
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    savePomodoroReflection: (reflectionData) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        const newReflection = { ...reflectionData, date: new Date().toLocaleDateString() };
+        const updatedReflections = [...(rawData.reflections || []), newReflection];
+        return { ...fw, rawData: { ...rawData, reflections: updatedReflections } };
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    updatePomodoroStats: (minutes, isBreak) => {
+      const { session } = get();
+      if (!session) return;
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== 'pomodoro') return fw;
+        const rawData = fw.rawData as any;
+        if (isBreak) {
+          return { ...fw, rawData: { ...rawData, totalBreakMinutes: (rawData.totalBreakMinutes || 0) + minutes } };
+        } else {
+          return { ...fw, rawData: { ...rawData, totalFocusMinutes: (rawData.totalFocusMinutes || 0) + minutes } };
+        }
+      });
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
     }
 
   })),
@@ -750,6 +832,7 @@ export const selectDeletePomodoroTask = (s: PTStoreState) => s.deletePomodoroTas
 export const selectTogglePomodoroTask = (s: PTStoreState) => s.togglePomodoroTask;
 export const selectReorderPomodoroTasks = (s: PTStoreState) => s.reorderPomodoroTasks;
 export const selectAddMorePomodoroTasks = (s: PTStoreState) => s.addMorePomodoroTasks;
+export const selectCompletePomodoroSession = (s: PTStoreState) => s.completePomodoroSession;
 
 export function useFramework(frameworkId: string) {
   return usePTStore((state) => state.session?.frameworks.find((f) => f.frameworkId === frameworkId) ?? null);

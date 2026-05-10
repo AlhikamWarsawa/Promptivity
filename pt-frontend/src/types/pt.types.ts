@@ -102,15 +102,38 @@ export interface EatTheFrogData {
   secondaryTasks: Task[];
 }
 
+export interface Interruption {
+  id: string;
+  timestamp: number;
+  type: 'internal' | 'external';
+  note?: string;
+}
+
+export interface PomodoroTask {
+  id: string;
+  title: string;
+  duration: number;
+  breakDuration: number;
+  sessions: number;
+  completedSessions: number;
+  bufferSessions: number;
+  isCompleted?: boolean;
+  interruptionLog?: Interruption[];
+  presetName?: string;
+}
+
+export interface PomodoroReflection {
+  date: string;
+  wentWell: string;
+  distractions: string;
+  improvements: string;
+}
+
 export interface PomodoroData {
-  tasks: {
-    id: string;
-    title: string;
-    duration: number;
-    breakDuration: number;
-    sessions: number;
-    isCompleted?: boolean;
-  }[];
+  tasks: PomodoroTask[];
+  reflections?: PomodoroReflection[];
+  totalFocusMinutes?: number;
+  totalBreakMinutes?: number;
 }
 
 export interface EisenhowerData {

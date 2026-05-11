@@ -246,7 +246,7 @@ function HeroSection({
               >
                 Ceritakan hidup, kerjaan, dan deadlinemu dalam satu paragraf.
                 PT memproses ceritamu menjadi task, prioritas, dan jadwal menggunakan
-                13 framework produktivitas terbukti.
+                15 framework produktivitas terbukti.
                 Tidak perlu tahu GTD, Kanban, atau Pomodoro — biarkan AI yang memilih.
               </p>
             </motion.div>
@@ -501,7 +501,7 @@ function FrameworkPreviewSection() {
               color: 'var(--pt-black)',
             }}
           >
-            13 framework. Satu cerita.
+            15 framework. Satu cerita.
           </h2>
         </motion.div>
 
@@ -512,7 +512,7 @@ function FrameworkPreviewSection() {
           className="text-center text-body mb-12 max-w-xl mx-auto"
           style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
         >
-          PT membangun 13 framework produktivitas dari ceritamu secara bersamaan,
+          PT membangun 15 framework produktivitas dari ceritamu secara bersamaan,
           lalu merekomendasikan yang paling cocok.
         </motion.p>
 

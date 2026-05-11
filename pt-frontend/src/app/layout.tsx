@@ -38,7 +38,7 @@ const gaegu = localFont({
 export const metadata: Metadata = {
   title: 'Promptivity — Tell Your Story. We Build Your Mission.',
   description:
-    'Promptivity mengubah cerita hidupmu menjadi mission plan terstruktur menggunakan 13 productivity framework berbasis AI.',
+    'Promptivity mengubah cerita hidupmu menjadi mission plan terstruktur menggunakan 15 productivity framework berbasis AI.',
   keywords: ['productivity', 'AI', 'mission planning', 'GTD', 'Kanban', 'Pomodoro', 'Promptivity'],
   openGraph: {
     title: 'Promptivity — Tell Your Story. We Build Your Mission.',

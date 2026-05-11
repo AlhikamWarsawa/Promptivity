@@ -401,7 +401,7 @@ function parseFrameworkRawData(
    
    Backend returns frameworks as an array of
    FrameworkOutput objects. We need to ensure
-   all 13 frameworks are present.
+   all 15 frameworks are present.
    ============================================ */
 function parseFrameworksArray(raw: unknown): FrameworkOutput[] {
   // Backend dapat return frameworks sebagai array ATAU object
@@ -448,7 +448,7 @@ function parseFrameworksArray(raw: unknown): FrameworkOutput[] {
     }
   }
 
-  // Build output list, ensure all 13 exist
+  // Build output list, ensure all 15 exist
   const result: FrameworkOutput[] = [];
 
   for (const fwId of FRAMEWORK_IDS) {
@@ -537,14 +537,14 @@ export function validateSession(session: PTSession): {
 
   if (!session.sessionId)          issues.push('Missing sessionId');
   if (!session.topRecommendation)  issues.push('Missing topRecommendation');
-  if (session.frameworks.length < 13) {
-    issues.push(`Only ${session.frameworks.length}/13 frameworks present`);
+  if (session.frameworks.length < 15) {
+    issues.push(`Only ${session.frameworks.length}/15 frameworks present`);
   }
   if (session.masterTaskList.length === 0) {
     issues.push('masterTaskList is empty');
   }
 
-  // Check all 13 framework IDs present
+  // Check all 15 framework IDs present
   const presentIds = new Set(session.frameworks.map((f) => f.frameworkId));
   for (const id of FRAMEWORK_IDS) {
     if (!presentIds.has(id)) {

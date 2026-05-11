@@ -286,7 +286,7 @@ function HeroSection({ firstName, role }: { firstName: string | null; role: stri
             {firstName ? `Welcome back, ${firstName}! 🎯` : 'Your Mission is Ready! 🎯'}
           </h1>
           <p className="mt-1.5 text-sm font-bold uppercase tracking-wide text-pt-brown" style={{ fontFamily: 'var(--font-body)' }}>
-            {role ? `${role} mode activated` : 'Moti has analyzed your story and built 13 frameworks for you.'}
+            {role ? `${role} mode activated` : 'Moti has analyzed your story and built 15 frameworks for you.'}
           </p>
         </div>
         <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 2, repeat: Infinity }} className="shrink-0">

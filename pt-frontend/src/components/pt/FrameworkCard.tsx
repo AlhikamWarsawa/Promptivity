@@ -9,10 +9,10 @@ import PTStorage         from '@/lib/storage';
 import type { FrameworkOutput } from '@/types/pt.types';
 
 /* ============================================
-   FrameworkCard — Grid card untuk 13 framework
+   FrameworkCard — Grid card untuk 15 framework
    
    Variants:
-   - grid    → compact card untuk 13-grid di dashboard
+   - grid    → compact card untuk 15-grid di dashboard
    - feature → large card untuk TopRecommendation
    ============================================ */
 

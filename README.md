@@ -8,7 +8,7 @@
 
 > Tell your story. We build your mission.
 
-Promptivity adalah AI powered productivity web app yang mengubah cerita user menjadi mission plan terstruktur menggunakan 13 framework produktivitas.
+Promptivity adalah AI powered productivity web app yang mengubah cerita user menjadi mission plan terstruktur menggunakan 15 framework produktivitas.
 
 ## Tech Stack
 
@@ -45,7 +45,7 @@ uvicorn main:app --reload
 # Runs on http://localhost:8000
 ```
 
-## 13 Productivity Frameworks
+## 15 Productivity Frameworks
 
 1. Getting Things Done (GTD)
 2. Kanban
@@ -60,3 +60,5 @@ uvicorn main:app --reload
 11. Commitment Inventory
 12. SMART Goals
 13. PARA Method
+14. Attention Management (Deep Work)
+15. Impact Optimization (Pareto)

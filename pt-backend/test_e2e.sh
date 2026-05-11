@@ -84,7 +84,7 @@ print(json.dumps(data))
   check_field "$RESPONSE" "data.todayPlan"
   check_field "$RESPONSE" "data.frameworks"
 
-  # Check all 13 frameworks exist
+  # Check all 15 frameworks exist
   FRAMEWORK_COUNT=$(echo "$RESPONSE" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
@@ -92,11 +92,11 @@ frameworks = d.get('data', {}).get('frameworks', [])
 print(len(frameworks))
 " 2>&1)
 
-  if [ "$FRAMEWORK_COUNT" = "13" ]; then
-    echo "  ✅ All 13 frameworks present"
+  if [ "$FRAMEWORK_COUNT" = "15" ]; then
+    echo "  ✅ All 15 frameworks present"
     PASS=$((PASS + 1))
   else
-    echo "  ❌ Only $FRAMEWORK_COUNT/13 frameworks present"
+    echo "  ❌ Only $FRAMEWORK_COUNT/15 frameworks present"
     FAIL=$((FAIL + 1))
   fi
 

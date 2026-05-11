@@ -60,7 +60,7 @@ export default function DevPage() {
 
       {/* ---- PALETTE SECTION ---- */}
       <Section title="Color Palette">
-        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-13">
+        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-15">
           {PALETTE.map(({ name, hex }) => (
             <div key={hex} className="flex flex-col gap-1">
               <div
@@ -282,7 +282,7 @@ export default function DevPage() {
       <HandDrawnDivider variant="wave" label="🗂️ FRAMEWORK CARDS" />
 
       {/* ---- FRAMEWORK PREVIEW ---- */}
-      <Section title="Framework Card Preview (semua 13)">
+      <Section title="Framework Card Preview (semua 15)">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {FRAMEWORK_LIST.map((fw) => (
             <PTCard

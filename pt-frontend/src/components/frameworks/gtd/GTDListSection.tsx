@@ -125,29 +125,37 @@ export function GTDListSection({
                   />
                 ))
               ) : (
-                // Render text items
-                (items as string[]).map((item, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="flex items-start gap-2.5"
-                  >
-                    <span
-                      className="shrink-0 w-5 h-5 rounded-full border-2 border-pt-black mt-0.5 flex items-center justify-center text-[10px] font-bold"
-                      style={{ backgroundColor: accentColor + '40', fontFamily: 'var(--font-body)' }}
-                      aria-hidden="true"
+                items.map((item, i) => (
+                  typeof item === 'string' ? (
+                    <motion.div
+                      key={`${item}-${i}`}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="flex items-start gap-2.5"
                     >
-                      {i + 1}
-                    </span>
-                    <p
-                      className="text-sm leading-snug"
-                      style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
-                    >
-                      {item}
-                    </p>
-                  </motion.div>
+                      <span
+                        className="shrink-0 w-5 h-5 rounded-full border-2 border-pt-black mt-0.5 flex items-center justify-center text-[10px] font-bold"
+                        style={{ backgroundColor: accentColor + '40', fontFamily: 'var(--font-body)' }}
+                        aria-hidden="true"
+                      >
+                        {i + 1}
+                      </span>
+                      <p
+                        className="text-sm leading-snug"
+                        style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
+                      >
+                        {item}
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <TaskCard
+                      key={item.id}
+                      task={item}
+                      onToggle={toggleTask}
+                      compact
+                    />
+                  )
                 ))
               )}
             </div>

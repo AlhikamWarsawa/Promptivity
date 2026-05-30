@@ -3,6 +3,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState }                from 'react';
 import { cn }                      from '@/lib/utils';
+import { usePTStore }              from '@/store/usePTStore';
+import type { Task }               from '@/types/pt.types';
 
 /* ============================================
    RoutineSection — Displays morning or evening
@@ -19,7 +21,7 @@ import { cn }                      from '@/lib/utils';
 interface RoutineSectionProps {
   title:       string;
   icon:        string;
-  items:       string[];
+  items:       (string | Task)[];
   accentColor: string;
   bgColor:     string;
   timeLabel?:  string;
@@ -37,6 +39,7 @@ export function RoutineSection({
 }: RoutineSectionProps) {
   const [isOpen, setIsOpen]     = useState(defaultOpen);
   const [checked, setChecked]   = useState<Set<number>>(new Set());
+  const toggleTask = usePTStore((s) => s.toggleTask);
 
   function toggleItem(i: number) {
     setChecked((prev) => {
@@ -46,7 +49,10 @@ export function RoutineSection({
     });
   }
 
-  const doneCount = checked.size;
+  const doneCount = items.reduce((sum, item, index) => {
+    if (typeof item === 'string') return sum + (checked.has(index) ? 1 : 0);
+    return sum + (item.isCompleted || item.completed ? 1 : 0);
+  }, 0);
   const allDone   = items.length > 0 && doneCount === items.length;
 
   return (
@@ -126,12 +132,14 @@ export function RoutineSection({
                 </p>
               ) : (
                 items.map((item, i) => {
-                  const isDone = checked.has(i);
+                  const isTask = typeof item !== 'string';
+                  const title = isTask ? item.title : item;
+                  const isDone = isTask ? Boolean(item.isCompleted ?? item.completed) : checked.has(i);
                   return (
                     <motion.button
-                      key={i}
+                      key={isTask ? item.id : `${item}-${i}`}
                       type="button"
-                      onClick={() => toggleItem(i)}
+                      onClick={() => isTask ? toggleTask(item.id) : toggleItem(i)}
                       whileHover={{ x: 2 }}
                       className="w-full flex items-start gap-3 text-left group"
                       aria-pressed={isDone}
@@ -178,7 +186,7 @@ export function RoutineSection({
                           textDecoration: isDone ? 'line-through' : 'none',
                         }}
                       >
-                        {item}
+                        {title}
                       </p>
                     </motion.button>
                   );

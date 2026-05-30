@@ -4,12 +4,14 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { FrameworkEmptyState } from '@/components/frameworks/FrameworkPageLayout';
 import { HandDrawnDivider } from '@/components/pt/HandDrawnDivider';
+import { TaskCard } from '@/components/pt/TaskCard';
 import { getFramework } from '@/lib/frameworkConfig';
-import { useFramework } from '@/store/usePTStore';
-import { DeepWorkData } from '@/types/pt.types';
+import { useFramework, usePTStore } from '@/store/usePTStore';
+import { DeepWorkData, Task } from '@/types/pt.types';
 
 export function DeepWorkView() {
   const fwData = useFramework('deep-work');
+  const toggleTask = usePTStore((s) => s.toggleTask);
   const meta = getFramework('deep-work');
 
   const rawData = useMemo(() => {
@@ -68,11 +70,23 @@ export function DeepWorkView() {
             <p className="text-sm text-pt-brown">No deep work blocks scheduled.</p>
           ) : (
             rawData.deepBlocks.map((block, i) => (
-              <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-sketch border-2 border-pt-black bg-pt-cream">
+              <div key={block.id ?? i} className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-sketch border-2 border-pt-black bg-pt-cream ${block.isCompleted || block.completed ? 'opacity-60' : ''}`}>
                 <div className="flex items-center gap-2 font-bold text-lg min-w-[140px]" style={{ color: accentColor }}>
+                  {block.id && (
+                    <button
+                      type="button"
+                      onClick={() => toggleTask(block.id!)}
+                      className={`w-5 h-5 rounded border-2 border-pt-black flex items-center justify-center text-[11px] font-bold ${block.isCompleted || block.completed ? 'bg-pt-green border-pt-green text-white' : 'bg-white hover:bg-pt-yellowP'}`}
+                      role="checkbox"
+                      aria-checked={Boolean(block.isCompleted ?? block.completed)}
+                      aria-label={block.isCompleted || block.completed ? `Mark "${block.task}" as incomplete` : `Mark "${block.task}" as complete`}
+                    >
+                      {block.isCompleted || block.completed ? '✓' : ''}
+                    </button>
+                  )}
                   {block.start} - {block.end}
                 </div>
-                <div className="text-base text-pt-black flex-1">{block.task}</div>
+                <div className={`text-base text-pt-black flex-1 ${block.isCompleted || block.completed ? 'line-through' : ''}`}>{block.task}</div>
               </div>
             ))
           )}
@@ -92,10 +106,7 @@ export function DeepWorkView() {
               <li className="text-sm text-pt-brown">No shallow tasks listed.</li>
             ) : (
               rawData.shallowTasks.map((task, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm">
-                  <span className="mt-0.5 text-pt-brown">•</span>
-                  <span>{task}</span>
-                </li>
+                <CheckableListItem key={typeof task === 'string' ? `${task}-${i}` : task.id} item={task} index={i} />
               ))
             )}
           </ul>
@@ -131,11 +142,27 @@ export function DeepWorkView() {
             <li className="text-pt-brown list-none -ml-5">No shutdown ritual defined.</li>
           ) : (
             rawData.shutdownRitual.map((step, i) => (
-              <li key={i} className="pl-1">{step}</li>
+              <li key={typeof step === 'string' ? `${step}-${i}` : step.id} className="list-none -ml-5">
+                <CheckableListItem item={step} index={i} ordered />
+              </li>
             ))
           )}
         </ol>
       </motion.div>
     </motion.div>
+  );
+}
+
+function CheckableListItem({ item, index, ordered = false }: { item: string | Task; index: number; ordered?: boolean }) {
+  const toggleTask = usePTStore((s) => s.toggleTask);
+  if (typeof item !== 'string') {
+    return <TaskCard task={item} onToggle={toggleTask} compact />;
+  }
+
+  return (
+    <li className="flex items-start gap-2 text-sm">
+      <span className="mt-0.5 text-pt-brown">{ordered ? `${index + 1}.` : '•'}</span>
+      <span>{item}</span>
+    </li>
   );
 }

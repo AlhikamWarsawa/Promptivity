@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, useInView } from 'framer-motion';
 import { useRef, useState, useEffect } from 'react';
-import { usePTStore } from '@/store/usePTStore';
 import { PTButton } from '@/components/pt/PTButton';
 import { PTCard } from '@/components/pt/PTCard';
 import { HandDrawnDivider } from '@/components/pt/HandDrawnDivider';
@@ -29,20 +28,14 @@ export default function WelcomePage() {
   const [mounted, setMounted] = useState(false);
   const [hasSession, setHasSession] = useState(false);
 
-  const isAuthenticated = usePTStore((s) => s.isAuthenticated);
-  const isAuthHydrated = usePTStore((s) => s.isAuthHydrated);
-
   useEffect(() => {
     setMounted(true);
-    
-    if (isAuthHydrated) {
-      const session = PTStorage.getSession();
-      if (session || isAuthenticated) {
-        setHasSession(true);
-        router.replace('/dashboard');
-      }
+    const session = PTStorage.getSession();
+    if (session) {
+      setHasSession(true);
+      router.replace('/dashboard');
     }
-  }, [router, isAuthenticated, isAuthHydrated]);
+  }, [router]);
 
   if (!mounted) {
     // Return skeleton yang sama persis dengan Navbar
@@ -61,7 +54,6 @@ export default function WelcomePage() {
     if (hasSession) {
       router.push('/dashboard');
     } else {
-      PTStorage.setSkipLogin();
       router.push('/onboarding');
     }
   };
@@ -71,10 +63,9 @@ export default function WelcomePage() {
       className="min-h-screen overflow-x-hidden"
       style={{ backgroundColor: 'var(--pt-white)' }}
     >
-      <Navbar onLogin={() => router.push('/auth/login')} hasSession={hasSession} onDashboard={() => router.push('/dashboard')} />
+      <Navbar hasSession={hasSession} onDashboard={() => router.push('/dashboard')} />
       <HeroSection
-        onLogin={() => router.push('/auth/login')}
-        onSkip={handleStart}
+        onStart={handleStart}
         hasSession={hasSession}
       />
       <HowItWorksSection />
@@ -90,11 +81,9 @@ export default function WelcomePage() {
    ============================================ */
 
 function Navbar({
-  onLogin,
   hasSession,
   onDashboard,
 }: {
-  onLogin: () => void;
   hasSession?: boolean;
   onDashboard?: () => void;
 }) {
@@ -125,7 +114,7 @@ function Navbar({
 
       {/* Nav right */}
       <div className="flex items-center gap-3">
-        {hasSession ? (
+        {hasSession && (
           <PTButton
             variant="outline"
             size="sm"
@@ -134,24 +123,6 @@ function Navbar({
           >
             Dashboard
           </PTButton>
-        ) : (
-          <>
-            <button
-              onClick={onLogin}
-              className="font-body text-sm font-semibold underline decoration-2 decoration-pt-black underline-offset-2 hover:text-pt-coral transition-colors"
-              style={{ color: 'var(--pt-black)' }}
-            >
-              Login
-            </button>
-            <PTButton
-              variant="outline"
-              size="sm"
-              onClick={onLogin}
-              className="hidden sm:flex"
-            >
-              Sign Up
-            </PTButton>
-          </>
         )}
       </div>
     </motion.nav>
@@ -163,12 +134,10 @@ function Navbar({
    ============================================ */
 
 function HeroSection({
-  onLogin,
-  onSkip,
+  onStart,
   hasSession,
 }: {
-  onLogin: () => void;
-  onSkip: () => void;
+  onStart: () => void;
   hasSession?: boolean;
 }) {
   // Staggered animation variants
@@ -259,21 +228,11 @@ function HeroSection({
               <PTButton
                 variant="secondary"
                 size="lg"
-                onClick={onSkip}
+                onClick={onStart}
                 className="group w-full sm:w-auto"
               >
-                <span>🚀 {hasSession ? 'Dashboard' : 'Start Without Account'}</span>
+                <span>🚀 {hasSession ? 'Dashboard' : 'Mulai Sekarang'}</span>
               </PTButton>
-              {!hasSession && (
-                <PTButton
-                  variant="ghost"
-                  size="lg"
-                  onClick={onLogin}
-                  className="w-full sm:w-auto"
-                >
-                  Login →
-                </PTButton>
-              )}
             </motion.div>
 
             {/* Micro-copy under buttons */}
@@ -283,20 +242,20 @@ function HeroSection({
                 className="text-sm"
                 style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)', opacity: 0.65 }}
               >
-                Skip login → data tersimpan di browser kamu. Gratis. Tidak perlu kartu kredit.
+                Data tersimpan di browser kamu. Gratis. Tidak perlu akun.
               </motion.p>
             )}
           </motion.div>
 
           {/* Right: Mascot / Illustration */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.85, rotate: -3 }}
-              animate={{ opacity: 1, scale: 1, rotate: 0 }}
-              transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
-              className="flex justify-center lg:justify-end"
-            >
-              <PTMascotIllustration />
-            </motion.div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, rotate: -3 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
+            className="flex justify-center lg:justify-end"
+          >
+            <PTMascotIllustration />
+          </motion.div>
         </div>
       </div>
     </section>
@@ -776,7 +735,7 @@ function FooterCTA({ onStart, hasSession }: { onStart: () => void; hasSession?: 
             onClick={onStart}
             className="text-xl px-10 py-5"
           >
-            {hasSession ? "🚀 Dashboard" : "🚀 Mulai Sekarang — Gratis"}
+            {hasSession ? "🚀 Dashboard" : "🚀 Mulai Sekarang"}
           </PTButton>
         </motion.div>
       </motion.div>

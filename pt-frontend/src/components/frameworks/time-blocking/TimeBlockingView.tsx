@@ -5,7 +5,7 @@ import { motion }               from 'framer-motion';
 import { TimeBlock }            from './TimeBlock';
 import { FrameworkEmptyState }  from '@/components/frameworks/FrameworkPageLayout';
 import { getFramework }         from '@/lib/frameworkConfig';
-import { useFramework }         from '@/store/usePTStore';
+import { useFramework, usePTStore } from '@/store/usePTStore';
 import PTStorage                from '@/lib/storage';
 
 /* ============================================
@@ -18,17 +18,21 @@ import PTStorage                from '@/lib/storage';
    ============================================ */
 
 interface ScheduleSlot {
+  id?:       string;
   time:     string;
   task:     string;
   duration: number;
   category: string;
   priority?: string;
+  isCompleted?: boolean;
+  completed?: boolean;
 }
 
 const PX_PER_MINUTE  = 1.4;  // Pixels per minute — adjust untuk density
 
 export function TimeBlockingView() {
   const fwData = useFramework('time-blocking');
+  const toggleTask = usePTStore((s) => s.toggleTask);
   const meta   = getFramework('time-blocking');
   const persona = PTStorage.getPersona();
   const energy = persona?.energyPattern ?? 'mixed';
@@ -48,7 +52,7 @@ export function TimeBlockingView() {
   }, [fwData]);
 
   if (!fwData || schedule.length === 0) {
-    return <FrameworkEmptyState frameworkId="time-blocking" message="Tidak ada jadwal yang berhasil diekstrak. Coba ceritakan lebih banyak tentang rutinitas harian, jam kerja, dan kapan kamu paling produktif." />;
+    return <FrameworkEmptyState frameworkId="time-blocking" />;
   }
 
   function localTimeToMinutes(time: string): number {
@@ -176,11 +180,14 @@ export function TimeBlockingView() {
                 style={{ top: `${topOffset}px` }}
               >
                 <TimeBlock
+                  id={slot.id}
                   time={slot.time}
                   task={slot.task}
                   duration={slot.duration}
                   category={slot.category}
                   priority={slot.priority}
+                  isCompleted={Boolean(slot.isCompleted ?? slot.completed)}
+                  onToggle={slot.id ? () => toggleTask(slot.id!) : undefined}
                   pixelsPerMinute={PX_PER_MINUTE}
                   index={i}
                 />

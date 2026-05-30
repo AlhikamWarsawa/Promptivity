@@ -6,6 +6,7 @@ import { PARASection }          from './PARASection';
 import { FrameworkEmptyState }  from '@/components/frameworks/FrameworkPageLayout';
 import { HandDrawnDivider }     from '@/components/pt/HandDrawnDivider';
 import { useFramework }         from '@/store/usePTStore';
+import type { Task }            from '@/types/pt.types';
 
 /* ============================================
    PARAView — PARA Method framework page.
@@ -22,9 +23,12 @@ import { useFramework }         from '@/store/usePTStore';
    ============================================ */
 
 interface PARAItemRaw {
+  id?:          string;
   name:        string;
   description: string;
-  tasks?:      Array<{ title: string; isCompleted?: boolean }>;
+  tasks?:      Task[];
+  isCompleted?: boolean;
+  completed?:  boolean;
 }
 
 interface PARAData {
@@ -49,12 +53,7 @@ export function PARAView() {
     (data.archives?.length  ?? 0);
 
   if (!fwData || totalItems === 0) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="para"
-        message="Moti tidak bisa mengklasifikasikan informasimu ke dalam PARA. Ceritakan tentang project aktifmu, tanggung jawab harian, referensi yang sering kamu pakai, dan hal-hal yang sudah selesai."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="para" />;
   }
 
   return (

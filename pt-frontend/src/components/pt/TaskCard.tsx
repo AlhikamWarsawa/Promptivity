@@ -35,10 +35,11 @@ export function TaskCard({
   className,
   compact = false,
 }: TaskCardProps) {
-  const isCompleted = task.isCompleted;
+  const isCompleted = Boolean(task.isCompleted ?? task.completed);
+  const canToggle = typeof onToggle === 'function';
 
   function handleToggle() {
-    onToggle?.(task.id);
+    if (canToggle) onToggle(task.id);
   }
 
   return (
@@ -61,49 +62,50 @@ export function TaskCard({
       )}
       style={isCompleted ? { backgroundColor: 'var(--pt-cream)' } : {}}
     >
-      {/* Checkbox */}
-      <button
-        type="button"
-        onClick={handleToggle}
-        className={cn(
-          'shrink-0 mt-0.5',
-          compact ? 'w-5 h-5' : 'w-6 h-6',
-          'rounded border-2 border-pt-black',
-          'flex items-center justify-center',
-          'transition-all duration-150',
-          'focus-visible:outline-2 focus-visible:outline-pt-blue focus-visible:outline-offset-2',
-          isCompleted
-            ? 'bg-pt-green border-pt-green'
-            : 'bg-white hover:bg-pt-yellowP',
-        )}
-        aria-label={isCompleted ? `Mark "${task.title}" as incomplete` : `Mark "${task.title}" as complete`}
-        aria-checked={isCompleted}
-        role="checkbox"
-      >
-        <AnimatePresence>
-          {isCompleted && (
-            <motion.svg
-              key="check"
-              width="12" height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              aria-hidden="true"
-            >
-              <motion.polyline
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 1 }}
-                exit={{ pathLength: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-                points="2,6 5,9 10,3"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </motion.svg>
+      {canToggle && (
+        <button
+          type="button"
+          onClick={handleToggle}
+          className={cn(
+            'shrink-0 mt-0.5',
+            compact ? 'w-5 h-5' : 'w-6 h-6',
+            'rounded border-2 border-pt-black',
+            'flex items-center justify-center',
+            'transition-all duration-150',
+            'focus-visible:outline-2 focus-visible:outline-pt-blue focus-visible:outline-offset-2',
+            isCompleted
+              ? 'bg-pt-green border-pt-green'
+              : 'bg-white hover:bg-pt-yellowP',
           )}
-        </AnimatePresence>
-      </button>
+          aria-label={isCompleted ? `Mark "${task.title}" as incomplete` : `Mark "${task.title}" as complete`}
+          aria-checked={isCompleted}
+          role="checkbox"
+        >
+          <AnimatePresence>
+            {isCompleted && (
+              <motion.svg
+                key="check"
+                width="12" height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                aria-hidden="true"
+              >
+                <motion.polyline
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  exit={{ pathLength: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  points="2,6 5,9 10,3"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </motion.svg>
+            )}
+          </AnimatePresence>
+        </button>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-w-0">

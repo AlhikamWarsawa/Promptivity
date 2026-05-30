@@ -1,22 +1,66 @@
 /* ============================================
    Promptivity — Global State Store (Zustand)
-   
+
    Single source of truth untuk:
    - PTSession (hasil AI processing)
    - Loading state
    - Error state
-   
+
    Auto-save ke localStorage setiap kali session
    berubah via middleware subscribe.
    ============================================ */
 
 import { create }     from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { PTSession, Personalization, Task } from '@/types/pt.types';
+import type { PTSession, Personalization, Task, FrameworkId } from '@/types/pt.types';
 import { processStoryAPI }                 from '@/lib/gemini';
-import { parseSession, parseTasks }                 from '@/lib/parsers';
+import { hasGeneratedTasks, parseFrameworkOutput, parseSession, parseTasks } from '@/lib/parsers';
+import {
+  appendFrameworkTasks,
+  extractFrameworkTasks,
+  toggleTaskInRawData,
+  type EisenhowerQuadrantId,
+  type FrameworkTaskDraft,
+} from '@/lib/frameworkTasks';
 import PTStorage                           from '@/lib/storage';
 import { API }                             from '@/lib/api';
+
+function buildFrameworkGenerateMoreFallback(frameworkId: FrameworkId): FrameworkTaskDraft[] {
+  if (frameworkId === 'eisenhower') {
+    return [
+      {
+        title: 'Choose the next urgent important action',
+        description: 'Pick the next task that needs attention today.',
+        priority: 'high',
+        estimatedMinutes: 30,
+        category: 'work',
+        quadrant: 'doNow',
+      },
+      {
+        title: 'Schedule one important follow-up',
+        description: 'Protect time for important work before it becomes urgent.',
+        priority: 'medium',
+        estimatedMinutes: 45,
+        category: 'work',
+        quadrant: 'schedule',
+      },
+      {
+        title: 'Simplify one low-impact responsibility',
+        description: 'Reduce work that does not need your full attention.',
+        priority: 'low',
+        estimatedMinutes: 20,
+        category: 'work',
+        quadrant: 'delegate',
+      },
+    ];
+  }
+
+  return [
+    { title: 'Clarify the next useful action', priority: 'medium', estimatedMinutes: 25, category: 'general' },
+    { title: 'Work on the highest-impact follow-up', priority: 'high', estimatedMinutes: 45, category: 'general' },
+    { title: 'Review progress and choose the next step', priority: 'medium', estimatedMinutes: 20, category: 'general' },
+  ];
+}
 
 /* ---- Store State Type ---- */
 
@@ -26,12 +70,6 @@ export interface PTStoreState {
   isLoading:   boolean;
   error:       string | null;
   loadedFromStorage: boolean;   // Apakah session di-load dari localStorage
-  
-  // Auth
-  token:           string | null;
-  user:            { id: string, name: string, email: string } | null;
-  isAuthenticated: boolean;
-  isAuthHydrated:  boolean;
   hasCompletedOnboarding: boolean;
 
   // Actions
@@ -47,6 +85,10 @@ export interface PTStoreState {
   clearSession:       () => void;
   clearError:         () => void;
   toggleTask:         (taskId: string) => void;
+  toggleTaskComplete: (taskId: string) => void;
+  toggleFrameworkTaskComplete: (frameworkId: FrameworkId, taskId: string) => void;
+  addFrameworkTask:   (frameworkId: FrameworkId, task: FrameworkTaskDraft) => void;
+  generateMoreFrameworkTasks: (frameworkId: FrameworkId) => Promise<{ success: boolean; error?: string }>;
   moveKanbanCard:     (taskId: string, toColumn: 'backlog' | 'inProgress' | 'done') => void;
   updateKRProgress:   (krIndex: number, progress: number) => void;
   updateGoalProgress: (goalIndex: number, progress: number) => void;
@@ -58,13 +100,7 @@ export interface PTStoreState {
   resetConfusedMessages:  () => void;
   clearConfusedSession: () => void;
 
-  // Auth Actions
-  login:            (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register:         (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout:           () => void;
-  initializeAuth:   () => Promise<void>;
   generateFrameworkTasks: (frameworkId: string) => Promise<{ success: boolean; error?: string }>;
-  fetchLatestSession: () => Promise<void>;
   setHasCompletedOnboarding: (val: boolean) => void;
 
   // Task Operations
@@ -97,12 +133,6 @@ export const usePTStore = create<PTStoreState>()(
     error:            null,
     loadedFromStorage:false,
     confusedMessages: [],
-
-    // Auth
-    token:           null,
-    user:            null,
-    isAuthenticated: false,
-    isAuthHydrated:  false,
     hasCompletedOnboarding: false,
 
     // ---- Actions ----
@@ -133,18 +163,6 @@ export const usePTStore = create<PTStoreState>()(
         });
 
         PTStorage.saveSession(result.session);
-        const localDate = new Date().toLocaleDateString('en-CA');
-        PTStorage.saveSessionByDate(localDate, result.session);
-
-        const { isAuthenticated } = get();
-        if (isAuthenticated) {
-          API.post('/sessions', {
-            id: result.session.sessionId,
-            session_date: localDate,
-            raw_story: result.session.story.rawText,
-            data: result.session
-          }).catch(err => console.error('Failed to sync session to backend:', err));
-        }
 
         set({ hasCompletedOnboarding: true });
         PTStorage.save(PTStorage.KEYS.ONBOARDED, true);
@@ -163,7 +181,7 @@ export const usePTStore = create<PTStoreState>()(
       if (!session || isLoading) return { success: false, error: 'No active session or already loading' };
 
       const fw = session.frameworks.find(f => f.frameworkId === frameworkId);
-      if (fw && fw.rawData && Object.keys(fw.rawData).length > 0) {
+      if (fw && hasGeneratedTasks(frameworkId as FrameworkId, fw.rawData)) {
         return { success: true };
       }
 
@@ -179,8 +197,16 @@ export const usePTStore = create<PTStoreState>()(
           return { success: false, error: errMsg };
         }
 
-        const updatedFrameworks = session.frameworks.map(f => 
-          f.frameworkId === frameworkId ? result.data : f
+        const updatedFrameworks = session.frameworks.map(f =>
+          f.frameworkId === frameworkId
+            ? {
+              ...f,
+              ...result.data,
+              isRecommended: f.isRecommended,
+              recommendationScore: f.recommendationScore,
+              recommendationReason: f.recommendationReason,
+            }
+            : f
         );
 
         const updatedSession = { ...session, frameworks: updatedFrameworks };
@@ -197,15 +223,24 @@ export const usePTStore = create<PTStoreState>()(
     loadFromStorage: () => {
       if (get().loadedFromStorage) return;
       const storedSession = PTStorage.getSession();
+      const normalizedSession = storedSession
+        ? parseSession(
+          storedSession,
+          storedSession.story?.rawText ?? '',
+          storedSession.story?.personalization,
+        )
+        : null;
       const storedConfused = PTStorage.getConfusedMessages();
       const hasOnboarded = PTStorage.load<boolean>(PTStorage.KEYS.ONBOARDED) || false;
 
       set({
-        session:          storedSession,
+        session:          normalizedSession,
         confusedMessages: storedConfused,
         loadedFromStorage: true,
-        hasCompletedOnboarding: storedSession ? true : hasOnboarded,
+        hasCompletedOnboarding: normalizedSession ? true : hasOnboarded,
       });
+
+      if (normalizedSession) PTStorage.saveSession(normalizedSession);
     },
 
     setSession: (session) => {
@@ -224,16 +259,27 @@ export const usePTStore = create<PTStoreState>()(
       const { session } = get();
       if (!session) return;
 
+      const toggleTaskObject = (task: Task): Task => {
+        const completed = !(task.isCompleted ?? task.completed);
+        return { ...task, isCompleted: completed, completed };
+      };
+
       const updatedMasterList = session.masterTaskList.map((task) =>
-        task.id === taskId ? { ...task, isCompleted: !task.isCompleted } : task,
+        task.id === taskId ? toggleTaskObject(task) : task,
       );
 
-      const updatedFrameworks = session.frameworks.map((fw) => ({
-        ...fw,
-        tasks: fw.tasks.map((task) =>
-          task.id === taskId ? { ...task, isCompleted: !task.isCompleted } : task,
-        ),
-      }));
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        const updatedTasks = fw.tasks.map((task) =>
+          task.id === taskId ? toggleTaskObject(task) : task,
+        );
+        const rawResult = toggleTaskInRawData(fw.rawData, taskId);
+
+        return {
+          ...fw,
+          tasks: updatedTasks,
+          rawData: rawResult.changed ? rawResult.rawData as any : fw.rawData,
+        };
+      });
 
       const updatedSession = {
         ...session,
@@ -242,6 +288,114 @@ export const usePTStore = create<PTStoreState>()(
       };
 
       set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    toggleTaskComplete: (taskId) => {
+      get().toggleTask(taskId);
+    },
+
+    toggleFrameworkTaskComplete: (frameworkId, taskId) => {
+      const { session } = get();
+      if (!session) return;
+
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== frameworkId) return fw;
+
+        const updatedTasks = fw.tasks.map((task) => {
+          if (task.id !== taskId) return task;
+          const completed = !(task.isCompleted ?? task.completed);
+          return { ...task, isCompleted: completed, completed };
+        });
+        const rawResult = toggleTaskInRawData(fw.rawData, taskId);
+
+        return {
+          ...fw,
+          tasks: updatedTasks,
+          rawData: rawResult.changed ? rawResult.rawData as any : fw.rawData,
+        };
+      });
+
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    addFrameworkTask: (frameworkId, taskData) => {
+      const { session } = get();
+      if (!session) return;
+
+      const defaultQuadrant: EisenhowerQuadrantId | undefined =
+        frameworkId === 'eisenhower' ? taskData.quadrant ?? 'doNow' : undefined;
+
+      const updatedFrameworks = session.frameworks.map((fw) => {
+        if (fw.frameworkId !== frameworkId) return fw;
+
+        const rawData = appendFrameworkTasks(
+          frameworkId,
+          fw.rawData,
+          [{ ...taskData, source: taskData.source ?? 'manual', quadrant: defaultQuadrant }],
+          { source: 'manual', defaultQuadrant },
+        );
+
+        return {
+          ...fw,
+          rawData,
+          tasks: extractFrameworkTasks(frameworkId, rawData),
+        };
+      });
+
+      const updatedSession = { ...session, frameworks: updatedFrameworks };
+      set({ session: updatedSession });
+      PTStorage.saveSession(updatedSession);
+    },
+
+    generateMoreFrameworkTasks: async (frameworkId) => {
+      const { session, isLoading } = get();
+      if (!session || isLoading) return { success: false, error: 'Already loading or no session' };
+
+      const framework = session.frameworks.find((fw) => fw.frameworkId === frameworkId);
+      if (!framework) return { success: false, error: 'Framework not found' };
+
+      const currentTasks = extractFrameworkTasks(frameworkId, framework.rawData);
+
+      set({ isLoading: true, error: null });
+      try {
+        const res = await API.post<any>('/api/add-more-tasks', {
+          sessionId: session.sessionId,
+          frameworkId,
+          existingTasks: currentTasks,
+          completedTasks: currentTasks.filter((task) => task.isCompleted || task.completed),
+          storyContext: session.story.rawText,
+          frameworkData: framework.rawData,
+        });
+
+        const incomingTasks = Array.isArray(res.newTasks) && res.newTasks.length > 0
+          ? res.newTasks
+          : buildFrameworkGenerateMoreFallback(frameworkId);
+
+        const updatedFrameworks = session.frameworks.map((fw) => {
+          if (fw.frameworkId !== frameworkId) return fw;
+          const rawData = appendFrameworkTasks(frameworkId, fw.rawData, incomingTasks, {
+            source: 'ai',
+            defaultQuadrant: frameworkId === 'eisenhower' ? 'doNow' : undefined,
+          });
+          return {
+            ...fw,
+            rawData,
+            tasks: extractFrameworkTasks(frameworkId, rawData),
+          };
+        });
+
+        const updatedSession = { ...session, frameworks: updatedFrameworks };
+        set({ session: updatedSession, isLoading: false });
+        PTStorage.saveSession(updatedSession);
+        return { success: true };
+      } catch (e: any) {
+        const errMsg = e?.message ?? 'Failed to generate more framework tasks.';
+        set({ isLoading: false, error: errMsg });
+        return { success: false, error: errMsg };
+      }
     },
 
     moveKanbanCard: (taskId, toColumn) => {
@@ -253,7 +407,7 @@ export const usePTStore = create<PTStoreState>()(
 
         const rawData = fw.rawData as any;
         let movedTask: Task | undefined;
-        
+
         const newBacklog = (rawData.backlog ?? []).filter((t: any) => {
           if (t.id === taskId) { movedTask = t; return false; } return true;
         });
@@ -266,7 +420,7 @@ export const usePTStore = create<PTStoreState>()(
 
         if (!movedTask) return fw;
 
-        const updatedTask = { ...movedTask, isCompleted: toColumn === 'done' };
+        const updatedTask = { ...movedTask, isCompleted: toColumn === 'done', completed: toColumn === 'done' };
         if (toColumn === 'backlog')    newBacklog.push(updatedTask);
         if (toColumn === 'inProgress') newInProgress.push(updatedTask);
         if (toColumn === 'done')       newDone.push(updatedTask);
@@ -284,8 +438,9 @@ export const usePTStore = create<PTStoreState>()(
       const updatedFrameworks = session.frameworks.map((fw) => {
         if (fw.frameworkId !== 'okrs') return fw;
         const rawData = fw.rawData as any;
+        const nextProgress = Math.max(0, Math.min(100, progress));
         const updatedKRs = (rawData.keyResults ?? []).map((kr: any, i: number) =>
-          i === krIndex ? { ...kr, progress: Math.max(0, Math.min(100, progress)) } : kr,
+          i === krIndex ? { ...kr, progress: nextProgress, isCompleted: nextProgress >= 100, completed: nextProgress >= 100 } : kr,
         );
         return { ...fw, rawData: { ...rawData, keyResults: updatedKRs } };
       });
@@ -300,8 +455,9 @@ export const usePTStore = create<PTStoreState>()(
       const updatedFrameworks = session.frameworks.map((fw) => {
         if (fw.frameworkId !== 'smart-goals') return fw;
         const rawData = fw.rawData as any;
+        const nextProgress = Math.max(0, Math.min(100, progress));
         const updatedGoals = (rawData.goals ?? []).map((goal: any, i: number) =>
-          i === goalIndex ? { ...goal, progress: Math.max(0, Math.min(100, progress)) } : goal,
+          i === goalIndex ? { ...goal, progress: nextProgress, isCompleted: nextProgress >= 100, completed: nextProgress >= 100 } : goal,
         );
         return { ...fw, rawData: { ...rawData, goals: updatedGoals } };
       });
@@ -335,86 +491,13 @@ export const usePTStore = create<PTStoreState>()(
       PTStorage.clearConfusedMessages();
     },
 
-    initializeAuth: async () => {
-      const token = PTStorage.getToken();
-      const user = PTStorage.getUser();
-      const hasOnboarded = PTStorage.load<boolean>(PTStorage.KEYS.ONBOARDED) || false;
-      set({ hasCompletedOnboarding: hasOnboarded });
-
-      if (token && user) {
-        set({ token, user, isAuthenticated: true });
-        try {
-          const freshUser = await API.get<any>('/auth/me');
-          set({ user: freshUser, isAuthenticated: true });
-          PTStorage.saveUser(freshUser);
-        } catch (e) {
-          set({ token: null, user: null, isAuthenticated: false });
-          PTStorage.clearAuth();
-        }
-      }
-      set({ isAuthHydrated: true });
-    },
-
-    login: async (email, password) => {
-      if (get().isLoading) return { success: false };
-      set({ isLoading: true, error: null });
-      try {
-        const res = await API.post<any>('/auth/login', { email, password });
-        set({ token: res.token, user: res.user, isAuthenticated: true, isLoading: false });
-        PTStorage.saveToken(res.token);
-        PTStorage.saveUser(res.user);
-        return { success: true };
-      } catch (e: any) {
-        set({ isLoading: false, error: e.message });
-        return { success: false, error: e.message };
-      }
-    },
-
-    register: async (name, email, password) => {
-      if (get().isLoading) return { success: false };
-      set({ isLoading: true, error: null });
-      try {
-        await API.post<any>('/auth/register', { name, email, password });
-        set({ isLoading: false });
-        return get().login(email, password);
-      } catch (e: any) {
-        set({ isLoading: false, error: e.message });
-        return { success: false, error: e.message };
-      }
-    },
-
-    logout: () => {
-      set({ token: null, user: null, isAuthenticated: false });
-      PTStorage.clearAuth();
-    },
-
-    fetchLatestSession: async () => {
-      const { isAuthenticated, isLoading } = get();
-      if (!isAuthenticated || isLoading) return;
-
-      set({ isLoading: true, error: null });
-      try {
-        const sessions = await API.get<any[]>('/sessions');
-        if (sessions.length > 0) {
-          const latest = sessions[0];
-          set({ session: latest.data, hasCompletedOnboarding: true, isLoading: false });
-          PTStorage.saveSession(latest.data);
-          PTStorage.save(PTStorage.KEYS.ONBOARDED, true);
-        } else {
-          set({ isLoading: false });
-        }
-      } catch (e) {
-        set({ isLoading: false });
-      }
-    },
-
     setHasCompletedOnboarding: (val) => {
       set({ hasCompletedOnboarding: val });
       PTStorage.save(PTStorage.KEYS.ONBOARDED, val);
     },
 
     addTask: (taskData) => {
-      const { session, isAuthenticated } = get();
+      const { session } = get();
       if (!session) return;
 
       const newTask: Task = {
@@ -425,7 +508,10 @@ export const usePTStore = create<PTStoreState>()(
         category: taskData.category || 'General',
         estimatedMinutes: taskData.estimatedMinutes || 30,
         isCompleted: false,
+        completed: false,
         framework: 'gtd',
+        frameworkId: 'gtd',
+        source: 'manual',
         subtasks: [],
         ...taskData,
       };
@@ -433,57 +519,30 @@ export const usePTStore = create<PTStoreState>()(
       const updatedSession = { ...session, masterTaskList: [newTask, ...session.masterTaskList] };
       set({ session: updatedSession });
       PTStorage.saveSession(updatedSession);
-      
-      if (isAuthenticated) {
-        API.post('/sessions', {
-          id: updatedSession.sessionId,
-          session_date: new Date().toLocaleDateString('en-CA'),
-          raw_story: updatedSession.story.rawText,
-          data: updatedSession
-        }).catch(err => console.error('Failed to sync added task:', err));
-      }
     },
 
     editTask: (taskId, updates) => {
-      const { session, isAuthenticated } = get();
+      const { session } = get();
       if (!session) return;
 
       const updatedList = session.masterTaskList.map(t => t.id === taskId ? { ...t, ...updates } : t);
       const updatedSession = { ...session, masterTaskList: updatedList };
       set({ session: updatedSession });
       PTStorage.saveSession(updatedSession);
-
-      if (isAuthenticated) {
-        API.post('/sessions', {
-          id: updatedSession.sessionId,
-          session_date: new Date().toLocaleDateString('en-CA'),
-          raw_story: updatedSession.story.rawText,
-          data: updatedSession
-        }).catch(err => console.error('Failed to sync edited task:', err));
-      }
     },
 
     deleteTask: (taskId) => {
-      const { session, isAuthenticated } = get();
+      const { session } = get();
       if (!session) return;
 
       const updatedList = session.masterTaskList.filter(t => t.id !== taskId);
       const updatedSession = { ...session, masterTaskList: updatedList };
       set({ session: updatedSession });
       PTStorage.saveSession(updatedSession);
-
-      if (isAuthenticated) {
-        API.post('/sessions', {
-          id: updatedSession.sessionId,
-          session_date: new Date().toLocaleDateString('en-CA'),
-          raw_story: updatedSession.story.rawText,
-          data: updatedSession
-        }).catch(err => console.error('Failed to sync deleted task:', err));
-      }
     },
 
     generateSubtasks: async (taskId) => {
-      const { session, isAuthenticated, isLoading } = get();
+      const { session, isLoading } = get();
       if (!session || isLoading) return;
 
       const task = session.masterTaskList.find(t => t.id === taskId);
@@ -502,15 +561,6 @@ export const usePTStore = create<PTStoreState>()(
           const updatedSession = { ...session, masterTaskList: updatedList };
           set({ session: updatedSession, isLoading: false });
           PTStorage.saveSession(updatedSession);
-
-          if (isAuthenticated) {
-            API.post('/sessions', {
-              id: updatedSession.sessionId,
-              session_date: new Date().toLocaleDateString('en-CA'),
-              raw_story: updatedSession.story.rawText,
-              data: updatedSession
-            }).catch(err => console.error('Failed to sync generated subtasks:', err));
-          }
         } else {
           set({ isLoading: false, error: 'Failed to generate subtasks' });
         }
@@ -520,7 +570,7 @@ export const usePTStore = create<PTStoreState>()(
     },
 
     addMoreTasks: async () => {
-      const { session, isAuthenticated, isLoading } = get();
+      const { session, isLoading } = get();
       if (!session || isLoading) return;
 
       set({ isLoading: true, error: null });
@@ -537,22 +587,13 @@ export const usePTStore = create<PTStoreState>()(
           const uniqueNewTasks = newTasks.filter((t: Task) => !existingIds.has(t.id));
 
           if (uniqueNewTasks.length === 0) {
-             set({ isLoading: false, error: 'Moti tidak menemukan task baru yang relevan.' });
+             set({ isLoading: false, error: 'No new unique tasks were generated yet.' });
              return;
           }
 
           const updatedSession = { ...session, masterTaskList: [...session.masterTaskList, ...uniqueNewTasks] };
           set({ session: updatedSession, isLoading: false });
           PTStorage.saveSession(updatedSession);
-
-          if (isAuthenticated) {
-            API.post('/sessions', {
-              id: updatedSession.sessionId,
-              session_date: new Date().toLocaleDateString('en-CA'),
-              raw_story: updatedSession.story.rawText,
-              data: updatedSession
-            }).catch(err => console.error('Failed to sync added tasks:', err));
-          }
         } else {
           set({ isLoading: false, error: res.error || 'Failed to find more tasks.' });
         }
@@ -572,10 +613,23 @@ export const usePTStore = create<PTStoreState>()(
           sessionId: session.sessionId,
           personalization: PTStorage.getPersonaOrDefault()
         });
-        
+
         if (res.success && res.data) {
-          const updatedFrameworks = session.frameworks.map(fw => 
-            fw.frameworkId === frameworkId ? { ...fw, rawData: res.data.data } : fw
+          const parsedFramework = parseFrameworkOutput(
+            frameworkId as FrameworkId,
+            res.data,
+            { ensureContent: true },
+          );
+          const updatedFrameworks = session.frameworks.map(fw =>
+            fw.frameworkId === frameworkId
+              ? {
+                ...fw,
+                ...parsedFramework,
+                isRecommended: fw.isRecommended,
+                recommendationScore: fw.recommendationScore,
+                recommendationReason: fw.recommendationReason,
+              }
+              : fw
           );
           const updatedSession = { ...session, frameworks: updatedFrameworks };
           set({ session: updatedSession, isLoading: false });
@@ -604,6 +658,9 @@ export const usePTStore = create<PTStoreState>()(
           sessions: taskData.sessions || 1,
           completedSessions: 0,
           isCompleted: false,
+          completed: false,
+          source: 'manual',
+          frameworkId: 'pomodoro',
         };
         return { ...fw, rawData: { ...rawData, tasks: [...(rawData.tasks || []), newTask] } };
       });
@@ -618,7 +675,7 @@ export const usePTStore = create<PTStoreState>()(
       const updatedFrameworks = session.frameworks.map((fw) => {
         if (fw.frameworkId !== 'pomodoro') return fw;
         const rawData = fw.rawData as any;
-        const updatedTasks = (rawData.tasks || []).map((t: any) => 
+        const updatedTasks = (rawData.tasks || []).map((t: any) =>
           t.id === taskId ? { ...t, ...updates } : t
         );
         return { ...fw, rawData: { ...rawData, tasks: updatedTasks } };
@@ -648,8 +705,8 @@ export const usePTStore = create<PTStoreState>()(
       const updatedFrameworks = session.frameworks.map((fw) => {
         if (fw.frameworkId !== 'pomodoro') return fw;
         const rawData = fw.rawData as any;
-        const updatedTasks = (rawData.tasks || []).map((t: any) => 
-          t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t
+        const updatedTasks = (rawData.tasks || []).map((t: any) =>
+          t.id === taskId ? { ...t, isCompleted: !(t.isCompleted ?? t.completed), completed: !(t.isCompleted ?? t.completed) } : t
         );
         return { ...fw, rawData: { ...rawData, tasks: updatedTasks } };
       });
@@ -679,7 +736,6 @@ export const usePTStore = create<PTStoreState>()(
       try {
         const fw = session.frameworks.find(f => f.frameworkId === 'pomodoro');
         const existingTasks = fw ? ((fw.rawData as any).tasks || []) : [];
-        // Map them to look like generic tasks for the backend
         const mappedExisting = existingTasks.map((t: any) => ({
           title: t.title,
           estimatedMinutes: t.duration * t.sessions,
@@ -692,8 +748,8 @@ export const usePTStore = create<PTStoreState>()(
         });
 
         if (res.success && res.newTasks) {
-          const newGenericTasks = parseTasks(res.newTasks, 'pomodoro'); // This just ensures it's parsed securely as generic Task[]
-          
+          const newGenericTasks = parseTasks(res.newTasks, 'pomodoro');
+
           const newPomTasks = newGenericTasks.map((t: Task, idx: number) => ({
             id: `pomodoro-new-${Date.now()}-${idx}`,
             title: t.title,
@@ -702,6 +758,9 @@ export const usePTStore = create<PTStoreState>()(
             sessions: Math.max(1, Math.ceil((t.estimatedMinutes || 25) / 25)),
             completedSessions: 0,
             isCompleted: false,
+            completed: false,
+            source: 'ai',
+            frameworkId: 'pomodoro',
           }));
 
           const updatedFrameworks = session.frameworks.map((fw) => {
@@ -731,7 +790,7 @@ export const usePTStore = create<PTStoreState>()(
           if (t.id === taskId) {
             const nextCompleted = (t.completedSessions || 0) + 1;
             const isFullyDone = nextCompleted >= t.sessions;
-            return { ...t, completedSessions: nextCompleted, isCompleted: isFullyDone };
+            return { ...t, completedSessions: nextCompleted, isCompleted: isFullyDone, completed: isFullyDone };
           }
           return t;
         });
@@ -752,8 +811,8 @@ export const usePTStore = create<PTStoreState>()(
           if (t.id === taskId) {
             const distractions = t.distractions || [];
             const count = (t.distractionCount || 0) + 1;
-            return { 
-              ...t, 
+            return {
+              ...t,
               distractionCount: count,
               distractions: [...distractions, { timestamp: new Date().toISOString(), note }]
             };
@@ -775,11 +834,9 @@ export const usePTStore = create<PTStoreState>()(
         const rawData = fw.rawData as any;
         const updatedTasks = (rawData.tasks || []).map((t: any) => {
           if (t.id === taskId) {
-            // Skips increment completedSessions but doesn't count towards productivity metrics if we had them
-            // For now, it just advances the queue.
             const nextCompleted = (t.completedSessions || 0) + 1;
             const isFullyDone = nextCompleted >= t.sessions;
-            return { ...t, completedSessions: nextCompleted, isCompleted: isFullyDone };
+            return { ...t, completedSessions: nextCompleted, isCompleted: isFullyDone, completed: isFullyDone };
           }
           return t;
         });
@@ -798,34 +855,14 @@ usePTStore.subscribe(
   (current) => {
     if (current.session) {
       PTStorage.saveSession(current.session);
-    } else {
-      PTStorage.clearSession();
     }
-    PTStorage.saveConfusedMessages(current.confusedMessages);
+    if (current.confusedMessages.length > 0) {
+      PTStorage.saveConfusedMessages(current.confusedMessages);
+    }
   },
-  { equalityFn: (a, b) => a.session === b.session && a.confusedMessages === b.confusedMessages }
 );
 
-/* ---- Selectors ---- */
-export const selectSession     = (s: PTStoreState) => s.session;
-export const selectIsLoading   = (s: PTStoreState) => s.isLoading;
-export const selectError       = (s: PTStoreState) => s.error;
-export const selectTopFramework = (s: PTStoreState) => s.session?.topRecommendation ?? null;
-export const selectTodayPlan   = (s: PTStoreState) => s.session?.todayPlan ?? [];
-export const selectMasterTasks = (s: PTStoreState) => s.session?.masterTaskList ?? [];
-export const selectToggleTask  = (s: PTStoreState) => s.toggleTask;
-export const selectMoveKanbanCard = (s: PTStoreState) => s.moveKanbanCard;
-export const selectUpdateKRProgress = (s: PTStoreState) => s.updateKRProgress;
-export const selectUpdateGoalProgress = (s: PTStoreState) => s.updateGoalProgress;
-
-export const selectAddPomodoroTask = (s: PTStoreState) => s.addPomodoroTask;
-export const selectEditPomodoroTask = (s: PTStoreState) => s.editPomodoroTask;
-export const selectDeletePomodoroTask = (s: PTStoreState) => s.deletePomodoroTask;
-export const selectTogglePomodoroTask = (s: PTStoreState) => s.togglePomodoroTask;
-export const selectReorderPomodoroTasks = (s: PTStoreState) => s.reorderPomodoroTasks;
-export const selectAddMorePomodoroTasks = (s: PTStoreState) => s.addMorePomodoroTasks;
-export const selectCompletePomodoroSession = (s: PTStoreState) => s.completePomodoroSession;
-
+/* ---- Hook: useFramework (convenience) ---- */
 export function useFramework(frameworkId: string) {
   return usePTStore((state) => state.session?.frameworks.find((f) => f.frameworkId === frameworkId) ?? null);
 }

@@ -6,8 +6,8 @@ import { GTDListSection }   from './GTDListSection';
 import { FrameworkEmptyState } from '@/components/frameworks/FrameworkPageLayout';
 import { HandDrawnDivider } from '@/components/pt/HandDrawnDivider';
 import { getFramework }     from '@/lib/frameworkConfig';
-import { useFramework }     from '@/store/usePTStore';
-import { PriorityBadge }    from '@/components/pt/PTBadge';
+import { useFramework, usePTStore } from '@/store/usePTStore';
+import { TaskCard }       from '@/components/pt/TaskCard';
 import type { Task }        from '@/types/pt.types';
 
 /* ============================================
@@ -23,16 +23,17 @@ import type { Task }        from '@/types/pt.types';
 
 export function GTDView() {
   const fwData = useFramework('gtd');
+  const toggleTask = usePTStore((s) => s.toggleTask);
   const meta   = getFramework('gtd');
 
   const rawData = useMemo(() => {
     if (!fwData?.rawData) return null;
     return fwData.rawData as {
-      inbox?:       string[];
+      inbox?:       Task[];
       nextActions?: Task[];
-      waitingFor?:  string[];
+      waitingFor?:  Task[];
       projects?:    { name: string; tasks: Task[] }[];
-      someday?:     string[];
+      someday?:     Task[];
     };
   }, [fwData]);
 
@@ -181,7 +182,7 @@ export function GTDView() {
                       </p>
                     ) : (
                       project.tasks.map((task) => (
-                        <TaskCardMini key={task.id} task={task} />
+                        <TaskCard key={task.id} task={task} onToggle={toggleTask} compact />
                       ))
                     )}
                   </div>
@@ -205,21 +206,5 @@ export function GTDView() {
         />
       </motion.div>
     </motion.div>
-  );
-}
-
-/* ---- Minimal task display untuk project tasks ---- */
-
-function TaskCardMini({ task }: { task: Task }) {
-  return (
-    <div
-      className="flex items-center gap-2 px-3 py-2 rounded border border-pt-black/15"
-      style={{ backgroundColor: 'var(--pt-cream)' }}
-    >
-      <PriorityBadge priority={task.priority} size="sm" showIcon={false} />
-      <span className="text-sm flex-1 truncate" style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}>
-        {task.title}
-      </span>
-    </div>
   );
 }

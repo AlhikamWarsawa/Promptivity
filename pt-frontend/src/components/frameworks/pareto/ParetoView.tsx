@@ -3,12 +3,14 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { FrameworkEmptyState } from '@/components/frameworks/FrameworkPageLayout';
+import { TaskCard } from '@/components/pt/TaskCard';
 import { getFramework } from '@/lib/frameworkConfig';
-import { useFramework } from '@/store/usePTStore';
-import { ParetoData } from '@/types/pt.types';
+import { useFramework, usePTStore } from '@/store/usePTStore';
+import { ParetoData, Task } from '@/types/pt.types';
 
 export function ParetoView() {
   const fwData = useFramework('pareto');
+  const toggleTask = usePTStore((s) => s.toggleTask);
   const meta = getFramework('pareto');
 
   const rawData = useMemo(() => {
@@ -60,10 +62,7 @@ export function ParetoView() {
               <li className="text-sm text-pt-brown">No high-impact tasks identified.</li>
             ) : (
               rawData.highImpact.map((item, i) => (
-                <li key={i} className="flex items-start gap-3 p-3 rounded-sketch border border-pt-black/20 bg-pt-cream">
-                  <span className="text-xl">⭐</span>
-                  <span className="text-pt-black font-bold">{item}</span>
-                </li>
+                <ParetoItem key={itemKey(item, i)} item={item} icon="⭐" strong onToggle={toggleTask} />
               ))
             )}
           </ul>
@@ -79,10 +78,7 @@ export function ParetoView() {
               <li className="text-sm text-pt-brown">No maintenance tasks listed.</li>
             ) : (
               rawData.maintenance.map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-pt-brown">
-                  <span className="mt-0.5">•</span>
-                  <span>{item}</span>
-                </li>
+                <ParetoItem key={itemKey(item, i)} item={item} icon="•" onToggle={toggleTask} />
               ))
             )}
           </ul>
@@ -98,10 +94,7 @@ export function ParetoView() {
               <li className="text-sm text-pt-brown">No leverage opportunities identified.</li>
             ) : (
               rawData.leverage.map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-[#059669] font-bold">
-                  <span className="mt-0.5">↳</span>
-                  <span>{item}</span>
-                </li>
+                <ParetoItem key={itemKey(item, i)} item={item} icon="↳" onToggle={toggleTask} />
               ))
             )}
           </ul>
@@ -117,10 +110,7 @@ export function ParetoView() {
               <li className="text-sm text-pt-brown">Nothing to eliminate listed.</li>
             ) : (
               rawData.eliminate.map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-[#D32F2F]">
-                  <span className="mt-0.5">✕</span>
-                  <span className="line-through opacity-80">{item}</span>
-                </li>
+                <ParetoItem key={itemKey(item, i)} item={item} icon="✕" muted onToggle={toggleTask} />
               ))
             )}
           </ul>
@@ -128,4 +118,37 @@ export function ParetoView() {
       </div>
     </motion.div>
   );
+}
+
+function ParetoItem({
+  item,
+  icon,
+  strong = false,
+  muted = false,
+  onToggle,
+}: {
+  item: string | Task;
+  icon: string;
+  strong?: boolean;
+  muted?: boolean;
+  onToggle: (id: string) => void;
+}) {
+  if (typeof item !== 'string') {
+    return (
+      <li>
+        <TaskCard task={item} onToggle={onToggle} compact />
+      </li>
+    );
+  }
+
+  return (
+    <li className={`flex items-start gap-2 text-sm ${strong ? 'font-bold text-pt-black' : 'text-pt-brown'} ${muted ? 'text-[#D32F2F]' : ''}`}>
+      <span className="mt-0.5">{icon}</span>
+      <span className={muted ? 'line-through opacity-80' : ''}>{item}</span>
+    </li>
+  );
+}
+
+function itemKey(item: string | Task, index: number): string {
+  return typeof item === 'string' ? `${item}-${index}` : item.id;
 }

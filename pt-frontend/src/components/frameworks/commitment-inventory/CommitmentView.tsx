@@ -22,11 +22,14 @@ import type { Priority }       from '@/types/pt.types';
    ============================================ */
 
 interface Commitment {
+  id?:             string;
   name:           string;
   urgency:        Priority;
   category:       string;
-  recommendation: 'continue' | 'drop' | 'delegate';
+  recommendation: 'continue' | 'drop' | 'delegate' | 'schedule';
   reason:         string;
+  isCompleted?:   boolean;
+  completed?:     boolean;
 }
 
 interface CommitmentRawData {
@@ -44,12 +47,7 @@ export function CommitmentView() {
   }, [fwData]);
 
   if (!fwData || commitments.length === 0) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="commitment-inventory"
-        message="Moti tidak mendeteksi komitmen dari ceritamu. Sebutkan semua hal yang kamu 'wajib' lakukan — pekerjaan, janji, proyek, tanggung jawab."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="commitment-inventory" />;
   }
 
   // Counts per filter
@@ -57,6 +55,7 @@ export function CommitmentView() {
     all:      commitments.length,
     continue: commitments.filter((c) => c.recommendation === 'continue').length,
     delegate: commitments.filter((c) => c.recommendation === 'delegate').length,
+    schedule: commitments.filter((c) => c.recommendation === 'schedule').length,
     drop:     commitments.filter((c) => c.recommendation === 'drop').length,
   };
 
@@ -65,8 +64,8 @@ export function CommitmentView() {
     ? commitments
     : commitments.filter((c) => c.recommendation === filter);
 
-  // Sort: drop first (most important to address), then delegate, then continue
-  const sortOrder = { drop: 0, delegate: 1, continue: 2 };
+  // Sort: drop first, then delegate, schedule, and continue
+  const sortOrder = { drop: 0, delegate: 1, schedule: 2, continue: 3 };
   const sortedAll = [...commitments].sort(
     (a, b) => sortOrder[a.recommendation] - sortOrder[b.recommendation],
   );
@@ -144,12 +143,15 @@ export function CommitmentView() {
         ) : (
           displayList.map((commitment, i) => (
             <CommitmentCard
-              key={`${commitment.name}-${i}`}
+              key={commitment.id ?? `${commitment.name}-${i}`}
+              id={commitment.id}
               name={commitment.name}
               urgency={commitment.urgency}
               category={commitment.category}
               recommendation={commitment.recommendation}
               reason={commitment.reason}
+              isCompleted={commitment.isCompleted}
+              completed={commitment.completed}
               index={i}
             />
           ))
@@ -170,7 +172,7 @@ export function CommitmentView() {
             style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
           >
             🐸 Langkah pertama: Hubungi {counts.drop} pihak yang perlu tahu
-            kamu tidak bisa lanjutkan komitmen tersebut.
+            komitmen yang perlu dihentikan atau dinegosiasikan.
             Jujur lebih baik dari silent commitment.
           </p>
         </motion.div>
@@ -189,6 +191,7 @@ function CommitmentSummary({
   const items = [
     { key: 'continue' as const, label: 'Lanjutkan', color: 'var(--pt-green)',   icon: '✅' },
     { key: 'delegate' as const, label: 'Delegasi',  color: 'var(--pt-mustard)', icon: '🤝' },
+    { key: 'schedule' as const, label: 'Jadwalkan', color: 'var(--pt-blue)',    icon: '📅' },
     { key: 'drop'     as const, label: 'Drop',      color: 'var(--pt-coral)',   icon: '🗑️' },
   ];
 
@@ -219,7 +222,7 @@ function CommitmentSummary({
 
       {/* Counts */}
       <div
-        className="grid grid-cols-3 divide-x-2 divide-pt-black"
+        className="grid grid-cols-4 divide-x-2 divide-pt-black"
         style={{ backgroundColor: 'var(--pt-white)' }}
       >
         {items.map((item) => (

@@ -8,6 +8,7 @@ import { cn }                      from '@/lib/utils';
 import { PTButton }                from '@/components/pt/PTButton';
 import { ScoreBar }                from '@/components/pt/ScoreBar';
 import { getFramework, getSortedFrameworkIds } from '@/lib/frameworkConfig';
+import { hasGeneratedTasks }       from '@/lib/parsers';
 import { usePTStore }              from '@/store/usePTStore';
 import { EmptyState }              from '@/components/pt/EmptyState';
 import type { FrameworkId }        from '@/types/pt.types';
@@ -39,7 +40,7 @@ export function FrameworkPageLayout({
   );
 
   const isTopPick = session?.topRecommendation === frameworkId;
-  const isGenerated = fwData && fwData.rawData && Object.keys(fwData.rawData).length > 0;
+  const hasTasks = !!fwData && hasGeneratedTasks(frameworkId, fwData.rawData);
 
   if (!session) {
     return (
@@ -122,7 +123,7 @@ export function FrameworkPageLayout({
             <h1 className="text-display leading-none" style={{ fontFamily: 'var(--font-display)', color: 'var(--pt-black)' }}>{meta.name}</h1>
             <p className="mt-1 text-sm font-semibold italic" style={{ color: meta.accentColor }}>&ldquo;{meta.tagline}&rdquo;</p>
             
-            {isGenerated && frameworkId !== 'pomodoro' && (
+            {hasTasks && frameworkId !== 'pomodoro' && (
               <div className="mt-4">
                 <PTButton
                   variant="outline"
@@ -131,7 +132,7 @@ export function FrameworkPageLayout({
                   isLoading={deepLoading}
                   disabled={deepLoading}
                 >
-                  ✨ Generate {meta.shortName} Tasks
+                  {deepLoading ? 'Regenerating...' : 'Regenerate'}
                 </PTButton>
               </div>
             )}
@@ -141,7 +142,7 @@ export function FrameworkPageLayout({
 
       <main className={cn('px-4 sm:px-6 py-8', className)}>
         <div className="max-w-4xl mx-auto">
-          {!isGenerated ? (
+          {!hasTasks ? (
             <FrameworkPlaceholder 
               meta={meta} 
               isLoading={localLoading} 
@@ -181,7 +182,7 @@ function FrameworkPlaceholder({ meta, isLoading, error, onGenerate }: any) {
       <div className="text-6xl mb-6">✨</div>
       <h2 className="text-h2 mb-2" style={{ fontFamily: 'var(--font-display)' }}>Siap membangun mission?</h2>
       <p className="text-sm text-gray-500 max-w-sm mx-auto mb-8">
-        Moti perlu sedikit waktu untuk membedah ceritamu ke dalam framework <strong>{meta.name}</strong> secara mendalam.
+        Moti akan mengubah ceritamu menjadi task yang konkret di framework <strong>{meta.name}</strong>.
       </p>
 
       {error && (
@@ -200,7 +201,7 @@ function FrameworkPlaceholder({ meta, isLoading, error, onGenerate }: any) {
         disabled={isLoading}
         className="px-10"
       >
-        {isLoading ? 'Membangun...' : 'Bangun Framework Ini'}
+        {isLoading ? 'Generating...' : 'Generate Tasks'}
       </PTButton>
     </div>
   );
@@ -213,8 +214,8 @@ export function FrameworkEmptyState({ frameworkId, message }: { frameworkId: str
   return (
     <EmptyState 
       icon="🤖"
-      message={`${frameworkId.toUpperCase()} Kosong`}
-      subMessage={message ?? 'Data tidak tersedia untuk framework ini.'}
+      message="Ready to generate tasks"
+      subMessage={message ?? `Use Generate Tasks to build a ${frameworkId} action plan.`}
     />
   );
 }

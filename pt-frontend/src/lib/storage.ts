@@ -1,6 +1,6 @@
 /* ============================================
    PT Storage — localStorage abstraction
-   
+
    Semua operasi localStorage di-centralize di sini.
    Kalau di masa depan pindah ke backend/IndexedDB,
    cukup update file ini saja.
@@ -12,14 +12,9 @@ import type { PTSession, Personalization } from '@/types/pt.types';
 export const STORAGE_KEYS = {
   SESSION:           'pt_session',
   PERSONA:           'pt_persona',
-  SKIP_LOGIN:        'pt_skip_login',
-  STORY_DRAFT:       'pt_story_draft',    // Draft cerita yang belum disubmit
-  WEEKLY_REFLECTION: 'pt_weekly_reflection', // Personal reflection notes (Weekly Review)
+  STORY_DRAFT:       'pt_story_draft',       // Draft cerita yang belum disubmit
+  WEEKLY_REFLECTION: 'pt_weekly_reflection', // Personal reflection notes
   CONFUSED_MESSAGES: 'pt_confused_messages', // History percakapan Confused Mode
-  JOURNAL_INDEX:     'pt_journal_index',     // List of dates with sessions
-  SESSION_BY_DATE:   'pt_session_',          // Prefix for session by date: pt_session_YYYY-MM-DD
-  TOKEN:             'pt_token',
-  USER:              'pt_user',
   ONBOARDED:         'pt_has_onboarded',
 } as const;
 
@@ -141,16 +136,6 @@ export function getPersonaOrDefault(): Personalization {
   return getPersona() ?? DEFAULT_PERSONA;
 }
 
-// ---- Skip Login Flag ----
-
-export function setSkipLogin(): void {
-  save(STORAGE_KEYS.SKIP_LOGIN, true);
-}
-
-export function isSkipLogin(): boolean {
-  return load<boolean>(STORAGE_KEYS.SKIP_LOGIN) === true;
-}
-
 // ---- Story Draft (untuk auto-save textarea) ----
 
 export function saveStoryDraft(text: string): void {
@@ -189,84 +174,16 @@ export function clearConfusedMessages(): void {
   remove(STORAGE_KEYS.CONFUSED_MESSAGES);
 }
 
-// ---- Journal ----
-
 /**
- * Save a session by date (YYYY-MM-DD).
- * Also updates the journal index.
- */
-export function saveSessionByDate(date: string, session: PTSession): void {
-  const key = `${STORAGE_KEYS.SESSION_BY_DATE}${date}`;
-  
-  // Load existing sessions for this date
-  const existing = load<PTSession[]>(key) ?? [];
-  
-  // To avoid duplicates of the same session (by sessionId), though unlikely here
-  const updated = [...existing.filter(s => s.sessionId !== session.sessionId), session];
-  
-  save(key, updated);
-  
-  // Update index
-  const index = load<string[]>(STORAGE_KEYS.JOURNAL_INDEX) ?? [];
-  if (!index.includes(date)) {
-    index.push(date);
-    save(STORAGE_KEYS.JOURNAL_INDEX, index.sort());
-  }
-}
-
-export function getSessionsByDate(date: string): PTSession[] {
-  const key = `${STORAGE_KEYS.SESSION_BY_DATE}${date}`;
-  return load<PTSession[]>(key) ?? [];
-}
-
-export function getAllSessionDates(): string[] {
-  return load<string[]>(STORAGE_KEYS.JOURNAL_INDEX) ?? [];
-}
-
-// ---- Auth ----
-
-export function saveToken(token: string): void {
-  save(STORAGE_KEYS.TOKEN, token);
-}
-
-export function getToken(): string | null {
-  return load<string>(STORAGE_KEYS.TOKEN);
-}
-
-export function saveUser(user: any): void {
-  save(STORAGE_KEYS.USER, user);
-}
-
-export function getUser(): any | null {
-  return load<any>(STORAGE_KEYS.USER);
-}
-
-/**
- * Hapus 5 session tertua untuk melegakan storage.
- * Mencari key pt_session_YYYY-MM-DD.
+ * Hapus session aktif untuk melegakan storage jika penuh.
  */
 export function clearOldSessions(): number {
   try {
-    const dates = getAllSessionDates();
-    if (dates.length <= 1) return 0; // Sisakan minimal 1
-
-    const toRemove = dates.slice(0, Math.min(5, dates.length - 1));
-    toRemove.forEach((date) => {
-      remove(`${STORAGE_KEYS.SESSION_BY_DATE}${date}`);
-    });
-
-    const newIndex = dates.filter((d) => !toRemove.includes(d));
-    save(STORAGE_KEYS.JOURNAL_INDEX, newIndex);
-    
-    return toRemove.length;
+    clearSession();
+    return 1;
   } catch {
     return 0;
   }
-}
-
-export function clearAuth(): void {
-  remove(STORAGE_KEYS.TOKEN);
-  remove(STORAGE_KEYS.USER);
 }
 
 // ---- PTStorage Namespace Object (untuk backward compat & convenience) ----
@@ -285,9 +202,6 @@ export const PTStorage = {
   savePersona,
   getPersona,
   getPersonaOrDefault,
-  // Skip login
-  setSkipLogin,
-  isSkipLogin,
   // Story draft
   saveStoryDraft,
   getStoryDraft,
@@ -302,17 +216,7 @@ export const PTStorage = {
   saveConfusedMessages,
   getConfusedMessages,
   clearConfusedMessages,
-  // Journal
-  saveSessionByDate,
-  getSessionsByDate,
-  getAllSessionDates,
   clearOldSessions,
-  // Auth
-  saveToken,
-  getToken,
-  saveUser,
-  getUser,
-  clearAuth,
 } as const;
 
 export default PTStorage;

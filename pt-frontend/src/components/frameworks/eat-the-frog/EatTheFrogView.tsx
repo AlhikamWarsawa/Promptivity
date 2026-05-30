@@ -21,13 +21,7 @@ import type { Task }                     from '@/types/pt.types';
    6. Micro-copy motivational
    ============================================ */
 
-interface FrogData {
-  title:            string;
-  reason:           string;
-  estimatedMinutes: number;
-  priority:         string;
-  category:         string;
-}
+type FrogData = Task & { reason: string };
 
 const FROG_QUOTES = [
   'Makan katakmu di pagi hari, dan tidak ada hal buruk lain yang akan terjadi sepanjang hari.',
@@ -39,7 +33,6 @@ const FROG_QUOTES = [
 export function EatTheFrogView() {
   const fwData     = useFramework('eat-the-frog');
   const toggleTask = usePTStore((s) => s.toggleTask);
-  const [frogDone, setFrogDone] = useState(false);
 
   // Fix hydration mismatch — set random quote after mount
   const [quote, setQuote] = useState(FROG_QUOTES[0]);
@@ -56,15 +49,11 @@ export function EatTheFrogView() {
   }, [fwData]);
 
   if (!fwData || !rawData?.frog) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="eat-the-frog"
-        message="Moti tidak bisa menemukan 'katak' dari ceritamu. Coba sebutkan tugas terbesar atau yang paling kamu hindari."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="eat-the-frog" />;
   }
 
   const { frog, secondaryTasks = [] } = rawData;
+  const frogDone = Boolean(frog.isCompleted ?? frog.completed);
 
   return (
     <div className="space-y-8">
@@ -102,7 +91,7 @@ export function EatTheFrogView() {
           >
             <TheFrogCard
               frog={frog}
-              onDone={() => setFrogDone(true)}
+              onDone={() => toggleTask(frog.id)}
             />
           </motion.div>
         ) : (
@@ -112,7 +101,7 @@ export function EatTheFrogView() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
-            <FrogCelebration onUndo={() => setFrogDone(false)} />
+            <FrogCelebration onUndo={() => toggleTask(frog.id)} />
           </motion.div>
         )}
       </AnimatePresence>

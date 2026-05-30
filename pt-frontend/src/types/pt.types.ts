@@ -65,7 +65,10 @@ export interface Task {
   deadline?: string;
   category: string;
   isCompleted: boolean;
+  completed?: boolean;
   framework: FrameworkId;
+  frameworkId?: FrameworkId;
+  source?: 'dashboard' | 'framework' | 'manual' | 'ai';
   subtasks?: string[];
   durationLabel?: string;
 }
@@ -90,15 +93,22 @@ export interface KanbanData {
 
 export interface TimeBlockData {
   schedule: {
+    id?: string;
     time: string;
     task: string;
+    title?: string;
     duration: number;
     category: string;
+    priority?: Priority;
+    isCompleted?: boolean;
+    completed?: boolean;
+    source?: 'framework';
+    frameworkId?: FrameworkId;
   }[];
 }
 
 export interface EatTheFrogData {
-  frog: { task: Task; reason: string };
+  frog: Task & { reason: string };
   secondaryTasks: Task[];
 }
 
@@ -110,6 +120,9 @@ export interface PomodoroTask {
   sessions: number;
   completedSessions: number;
   isCompleted?: boolean;
+  completed?: boolean;
+  source?: 'framework';
+  frameworkId?: FrameworkId;
   distractionCount?: number;
   distractions?: { timestamp: string; note: string }[];
 }
@@ -126,9 +139,9 @@ export interface EisenhowerData {
 }
 
 export interface SystemistData {
-  morning: string[];
+  morning: (string | Task)[];
   workTasks: Task[];
-  evening: string[];
+  evening: (string | Task)[];
   recurring: Task[];
 }
 
@@ -143,31 +156,44 @@ export interface MediumMethodData {
 export interface OKRData {
   objective: string;
   keyResults: {
+    id?: string;
     kr: string;
+    title?: string;
     metric: string;
     deadline: string;
     progress: number;
+    isCompleted?: boolean;
+    completed?: boolean;
+    source?: 'framework';
+    frameworkId?: FrameworkId;
   }[];
 }
 
 export interface WeeklyReviewData {
   winsThisWeek: string[];
   lessonsLearned: string[];
-  nextWeekFocus: string[];
+  nextWeekFocus: (string | Task)[];
 }
 
 export interface CommitmentInventoryData {
   commitments: {
+    id?: string;
     name: string;
+    title?: string;
     urgency: Priority;
     category: string;
-    recommendation: 'continue' | 'drop' | 'delegate';
+    recommendation: 'continue' | 'drop' | 'delegate' | 'schedule';
     reason: string;
+    isCompleted?: boolean;
+    completed?: boolean;
+    source?: 'framework';
+    frameworkId?: FrameworkId;
   }[];
 }
 
 export interface SMARTGoalsData {
   goals: {
+    id?: string;
     title: string;
     specific: string;
     measurable: string;
@@ -175,33 +201,43 @@ export interface SMARTGoalsData {
     relevant: string;
     timeBound: string;
     progress: number;
+    isCompleted?: boolean;
+    completed?: boolean;
+    source?: 'framework';
+    frameworkId?: FrameworkId;
   }[];
 }
 
 export interface PARAData {
-  projects: { name: string; description: string; tasks: Task[] }[];
-  areas: { name: string; description: string }[];
-  resources: { name: string; description: string }[];
-  archives: { name: string; description: string }[];
+  projects: { id?: string; name: string; title?: string; description: string; tasks: Task[]; isCompleted?: boolean; completed?: boolean; source?: 'framework'; frameworkId?: FrameworkId }[];
+  areas: { id?: string; name: string; title?: string; description: string; isCompleted?: boolean; completed?: boolean; source?: 'framework'; frameworkId?: FrameworkId }[];
+  resources: { id?: string; name: string; title?: string; description: string; isCompleted?: boolean; completed?: boolean; source?: 'framework'; frameworkId?: FrameworkId }[];
+  archives: { id?: string; name: string; title?: string; description: string; isCompleted?: boolean; completed?: boolean; source?: 'framework'; frameworkId?: FrameworkId }[];
 }
 
 export interface DeepWorkData {
   focusGoal: string;
   deepBlocks: {
+    id?: string;
     start: string;
     end: string;
     task: string;
+    title?: string;
+    isCompleted?: boolean;
+    completed?: boolean;
+    source?: 'framework';
+    frameworkId?: FrameworkId;
   }[];
-  shallowTasks: string[];
+  shallowTasks: (string | Task)[];
   distractions: string[];
-  shutdownRitual: string[];
+  shutdownRitual: (string | Task)[];
 }
 
 export interface ParetoData {
-  highImpact: string[];
-  maintenance: string[];
-  eliminate: string[];
-  leverage: string[];
+  highImpact: (string | Task)[];
+  maintenance: (string | Task)[];
+  eliminate: (string | Task)[];
+  leverage: (string | Task)[];
 }
 
 export type FrameworkRawData =

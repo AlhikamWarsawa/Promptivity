@@ -1,1 +1,1 @@
-# routers package
+from . import ai

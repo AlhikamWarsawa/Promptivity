@@ -9,11 +9,14 @@ import { cn }     from '@/lib/utils';
    ============================================ */
 
 interface TimeBlockProps {
+  id?:         string;
   time:        string;       // "09:00"
   task:        string;
   duration:    number;       // menit
   category:    string;
   priority?:   string;
+  isCompleted?: boolean;
+  onToggle?:  () => void;
   pixelsPerMinute: number;   // untuk kalkulasi height
   index:       number;       // untuk stagger animation
 }
@@ -27,7 +30,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string
 };
 
 export function TimeBlock({
-  time, task, duration, category, priority, pixelsPerMinute, index,
+  time, task, duration, category, priority, isCompleted = false, onToggle, pixelsPerMinute, index,
 }: TimeBlockProps) {
   const colors = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.other;
   const height  = Math.max(duration * pixelsPerMinute, 40);   // Minimum 40px
@@ -49,6 +52,7 @@ export function TimeBlock({
         borderLeftColor: colors.border,
         borderLeftWidth: '5px',
         boxShadow:       '2px 2px 0px #2B2B2B',
+        opacity:         isCompleted ? 0.65 : 1,
       }}
       title={`${time} — ${task} (${duration}m)`}
     >
@@ -63,22 +67,43 @@ export function TimeBlock({
             {time}
           </p>
           {/* Task title */}
-          <p
-            className={cn(
-              'font-semibold leading-tight',
-              isShort ? 'text-[11px]' : 'text-sm',
+          <div className="flex items-start gap-2">
+            {onToggle && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle();
+                }}
+                className={cn(
+                  'shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-pt-black flex items-center justify-center text-[11px] font-bold transition-colors',
+                  isCompleted ? 'bg-pt-green border-pt-green text-white' : 'bg-white hover:bg-pt-yellowP',
+                )}
+                role="checkbox"
+                aria-checked={isCompleted}
+                aria-label={isCompleted ? `Mark "${task}" as incomplete` : `Mark "${task}" as complete`}
+              >
+                {isCompleted ? '✓' : ''}
+              </button>
             )}
-            style={{
-              fontFamily:  'var(--font-body)',
-              color:       colors.text,
-              overflow:    'hidden',
-              display:     '-webkit-box',
-              WebkitLineClamp: isShort ? 1 : 2,
-              WebkitBoxOrient: 'vertical',
-            }}
-          >
-            {task}
-          </p>
+            <p
+              className={cn(
+                'font-semibold leading-tight',
+                isShort ? 'text-[11px]' : 'text-sm',
+                isCompleted && 'line-through opacity-60',
+              )}
+              style={{
+                fontFamily:  'var(--font-body)',
+                color:       colors.text,
+                overflow:    'hidden',
+                display:     '-webkit-box',
+                WebkitLineClamp: isShort ? 1 : 2,
+                WebkitBoxOrient: 'vertical',
+              }}
+            >
+              {task}
+            </p>
+          </div>
         </div>
 
         {/* Bottom meta (only if tall enough) */}

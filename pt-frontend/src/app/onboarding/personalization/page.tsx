@@ -107,7 +107,6 @@ export default function PersonalizationPage() {
     };
 
     PTStorage.savePersona(persona);
-    PTStorage.setSkipLogin();
 
     // Sedikit delay agar user lihat loading state
     await new Promise((r) => setTimeout(r, 500));

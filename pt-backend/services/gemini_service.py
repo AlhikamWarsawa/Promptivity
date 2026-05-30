@@ -53,10 +53,22 @@ class GeminiService:
         data = {"story": story, "personalization": personalization}
         return hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
-    def _save_story(self, session_id: str, story: str, personalization: Optional[dict]):
+    def _save_story(
+        self,
+        session_id: str,
+        story: str,
+        personalization: Optional[dict],
+        dashboard_tasks: Optional[list] = None,
+        today_plan: Optional[list] = None,
+    ):
         path = os.path.join(self.storage_dir, f"{session_id}.json")
         with open(path, "w") as f:
-            json.dump({"story": story, "personalization": personalization}, f)
+            json.dump({
+                "story": story,
+                "personalization": personalization,
+                "dashboardTasks": dashboard_tasks or [],
+                "todayPlan": today_plan or [],
+            }, f)
 
     def _load_story(self, session_id: str) -> dict:
         path = os.path.join(self.storage_dir, f"{session_id}.json")
@@ -98,6 +110,13 @@ class GeminiService:
         story_hash = self._get_story_hash(story, personalization)
         cached = self._get_cached_session(story_hash)
         if cached:
+            self._save_story(
+                cached.get("sessionId", str(uuid.uuid4())),
+                story,
+                personalization,
+                cached.get("masterTaskList", []),
+                cached.get("todayPlan", []),
+            )
             return cached
 
         from services.prompts import DASHBOARD_SYSTEM_PROMPT, build_user_prompt
@@ -110,7 +129,6 @@ class GeminiService:
         parsed = self._parse_and_validate_dashboard(self._extract_json(response_text))
         
         session_id = str(uuid.uuid4())
-        self._save_story(session_id, story, personalization)
         
         frameworks_list = []
         for fw in parsed.get("frameworks", []):
@@ -139,6 +157,13 @@ class GeminiService:
             "frameworks":              frameworks_list,
             "isDemo":                  False,
         }
+        self._save_story(
+            session_id,
+            story,
+            personalization,
+            session.get("masterTaskList", []),
+            session.get("todayPlan", []),
+        )
         
         self._cache_session(story_hash, session)
         return session
@@ -147,6 +172,16 @@ class GeminiService:
         """Generate specific framework data on demand."""
         cached = self._get_cached_framework(session_id, framework_id)
         if cached:
+            cached_data = cached.get("rawData", {})
+            ensured_data = self.ensure_framework_has_content(framework_id, cached_data)
+            if ensured_data != cached_data:
+                cached["rawData"] = ensured_data
+                cached["todayActions"] = self._ensure_today_actions(
+                    framework_id,
+                    cached.get("todayActions", []),
+                    ensured_data,
+                )
+                self._cache_framework(session_id, framework_id, cached)
             return cached
 
         from services.prompts import FRAMEWORK_SYSTEM_PROMPT, build_framework_prompt
@@ -154,7 +189,9 @@ class GeminiService:
         user_prompt = build_framework_prompt(
             story_data["story"], 
             framework_id, 
-            story_data["personalization"]
+            story_data["personalization"],
+            story_data.get("dashboardTasks", []),
+            story_data.get("todayPlan", []),
         )
         
         system_instruction = FRAMEWORK_SYSTEM_PROMPT.replace("{framework_id}", framework_id)
@@ -166,141 +203,421 @@ class GeminiService:
         parsed = self._extract_json(response_text)
         data = json.loads(parsed)
         
-        # --- Task Validation & Fallback ---
-        framework_data = data.get("data", {})
-        total_tasks = self._count_total_tasks(framework_id, framework_data)
-        
-        if total_tasks < 3:
-            self._inject_fallback_tasks(framework_id, framework_data, 3 - total_tasks)
+        framework_data = self.ensure_framework_has_content(
+            framework_id,
+            data.get("data", {}),
+        )
+        today_actions = self._ensure_today_actions(
+            framework_id,
+            data.get("todayActions", []),
+            framework_data,
+        )
         
         result = {
             "frameworkId":  framework_id,
             "rawData":      framework_data,
-            "todayActions": data.get("todayActions", []),
+            "todayActions": today_actions,
             "tasks":        [], 
         }
         
         self._cache_framework(session_id, framework_id, result)
         return result
 
-    def _count_total_tasks(self, framework_id: str, data: dict) -> int:
-        """Count all actionable tasks/items within the framework structure."""
-        count = 0
+    def ensure_framework_has_content(self, framework_id: str, data: object) -> dict:
+        """Return valid framework data with enough actionable content."""
+        if isinstance(data, dict) and self._framework_meets_minimum(framework_id, data):
+            return data
+        return self.build_framework_fallback(framework_id)
+
+    def count_actionable_items(self, framework_id: str, data: object) -> int:
+        """Count concrete task/action content in a framework-specific object."""
+        if not isinstance(data, dict):
+            return 0
+
         try:
-            if framework_id == 'gtd':
-                count += len(data.get('nextActions', []))
-                for p in data.get('projects', []):
-                    count += len(p.get('tasks', []))
-            elif framework_id == 'kanban':
-                count += len(data.get('backlog', []))
-                count += len(data.get('inProgress', []))
-            elif framework_id == 'time-blocking':
-                count += len(data.get('schedule', []))
-            elif framework_id == 'eat-the-frog':
-                if data.get('frog'): count += 1
-                count += len(data.get('secondaryTasks', []))
-            elif framework_id == 'pomodoro':
-                count += len(data.get('tasks', []))
-            elif framework_id == 'eisenhower':
-                count += len(data.get('doNow', []))
-                count += len(data.get('schedule', []))
-                count += len(data.get('delegate', []))
-            elif framework_id == 'systemist':
-                count += len(data.get('workTasks', []))
-                count += len(data.get('recurring', []))
-            elif framework_id == 'medium-method':
-                for d in data.get('days', []):
-                    if d.get('mainTask'): count += 1
-                    count += len(d.get('supportTasks', []))
-            elif framework_id == 'okrs':
-                count += len(data.get('keyResults', []))
-            elif framework_id == 'weekly-review':
-                count += len(data.get('nextWeekFocus', []))
-            elif framework_id == 'commitment-inventory':
-                count += len(data.get('commitments', []))
-            elif framework_id == 'smart-goals':
-                count += len(data.get('goals', []))
-            elif framework_id == 'para':
-                for p in data.get('projects', []):
-                    count += len(p.get('tasks', []))
-            elif framework_id == 'deep-work':
-                count += len(data.get('deepBlocks', []))
-                count += len(data.get('shallowTasks', []))
-            elif framework_id == 'pareto':
-                count += len(data.get('highImpact', []))
-                count += len(data.get('maintenance', []))
+            if framework_id == "gtd":
+                return (
+                    self._count_list(data.get("inbox"))
+                    + self._count_list(data.get("nextActions"))
+                    + self._count_projects(data.get("projects"))
+                )
+            if framework_id == "kanban":
+                return self._count_list(data.get("backlog")) + self._count_list(data.get("todo"))
+            if framework_id == "time-blocking":
+                return self._count_list(data.get("schedule"))
+            if framework_id == "eat-the-frog":
+                return (1 if self._has_actionable_value(data.get("frog")) else 0) + self._count_list(data.get("secondaryTasks"))
+            if framework_id == "pomodoro":
+                return self._count_list(data.get("tasks"))
+            if framework_id == "eisenhower":
+                return sum(self._count_list(data.get(key)) for key in ("doNow", "schedule", "delegate", "eliminate"))
+            if framework_id == "systemist":
+                return (
+                    self._count_list(data.get("morning"))
+                    + self._count_list(data.get("workTasks"))
+                    + self._count_list(data.get("evening"))
+                    + self._count_list(data.get("recurring"))
+                )
+            if framework_id == "medium-method":
+                count = 0
+                for day in data.get("days", []) if isinstance(data.get("days"), list) else []:
+                    if isinstance(day, dict):
+                        count += 1 if self._has_actionable_value(day.get("mainTask")) else 0
+                        count += self._count_list(day.get("supportTasks"))
+                return count
+            if framework_id == "okrs":
+                return self._count_list(data.get("keyResults"))
+            if framework_id == "weekly-review":
+                return (
+                    self._count_list(data.get("winsThisWeek"))
+                    + self._count_list(data.get("lessonsLearned"))
+                    + self._count_list(data.get("nextWeekFocus"))
+                )
+            if framework_id == "commitment-inventory":
+                return self._count_list(data.get("commitments"))
+            if framework_id == "smart-goals":
+                count = 0
+                for goal in data.get("goals", []) if isinstance(data.get("goals"), list) else []:
+                    if isinstance(goal, dict):
+                        count += sum(
+                            1
+                            for key in ("title", "specific", "measurable", "achievable", "relevant", "timeBound")
+                            if self._has_actionable_value(goal.get(key))
+                        )
+                    elif self._has_actionable_value(goal):
+                        count += 1
+                return count
+            if framework_id == "para":
+                return (
+                    self._count_projects(data.get("projects"))
+                    + self._count_list(data.get("areas"))
+                    + self._count_list(data.get("resources"))
+                    + self._count_list(data.get("archives"))
+                )
+            if framework_id == "deep-work":
+                return (
+                    (1 if self._has_actionable_value(data.get("focusGoal")) else 0)
+                    + self._count_list(data.get("deepBlocks"))
+                    + self._count_list(data.get("shallowTasks"))
+                    + self._count_list(data.get("distractions"))
+                    + self._count_list(data.get("shutdownRitual"))
+                )
+            if framework_id == "pareto":
+                return sum(self._count_list(data.get(key)) for key in ("highImpact", "maintenance", "eliminate", "leverage"))
         except Exception:
-            pass
+            return 0
+
+        return 0
+
+    def build_framework_fallback(self, framework_id: str) -> dict:
+        """Build framework-specific fallback content for vague or malformed AI output."""
+        fallbacks = {
+            "gtd": {
+                "inbox": [
+                    "Clarify everything currently on your mind",
+                    "List all unfinished responsibilities",
+                    "Capture any deadline or commitment",
+                ],
+                "nextActions": [
+                    "Choose the most urgent task",
+                    "Break it into the next physical action",
+                    "Schedule when to do it",
+                ],
+                "projects": ["Organize current responsibilities"],
+                "waitingFor": [],
+                "someday": [],
+            },
+            "kanban": {
+                "backlog": [
+                    "Clarify current priorities",
+                    "Break big task into smaller task",
+                    "Prepare next action",
+                ],
+                "inProgress": [],
+                "done": [],
+            },
+            "time-blocking": {
+                "schedule": [
+                    {"time": "09:00", "task": "Clarify priorities", "duration": 30, "category": "work", "priority": "high"},
+                    {"time": "10:00", "task": "Work on highest priority task", "duration": 60, "category": "work", "priority": "critical"},
+                    {"time": "13:00", "task": "Review progress and adjust plan", "duration": 30, "category": "work", "priority": "medium"},
+                ],
+            },
+            "eat-the-frog": {
+                "frog": {
+                    "title": "Do the most important unfinished responsibility first",
+                    "task": "Do the most important unfinished responsibility first",
+                    "reason": "This reduces mental load and creates momentum early.",
+                    "estimatedMinutes": 90,
+                    "priority": "critical",
+                    "category": "work",
+                },
+                "secondaryTasks": [
+                    "Prepare materials",
+                    "Handle smaller follow-up task",
+                    "Review progress",
+                ],
+            },
+            "pomodoro": {
+                "tasks": [
+                    {"title": "Prioritize urgent tasks", "sessions": 2, "duration": 25, "breakDuration": 5},
+                    {"title": "Deep focus work block", "sessions": 3, "duration": 25, "breakDuration": 5},
+                    {"title": "Review and organize next steps", "sessions": 1, "duration": 25, "breakDuration": 5},
+                ],
+            },
+            "eisenhower": {
+                "doNow": ["Handle the most urgent important task"],
+                "schedule": ["Plan important non-urgent work"],
+                "delegate": ["Identify task that can be simplified or delegated"],
+                "eliminate": ["Remove one low-value distraction"],
+            },
+            "systemist": {
+                "morning": [
+                    "Review today's priorities",
+                    "Pick one main focus",
+                    "Prepare workspace",
+                ],
+                "workTasks": [
+                    "Execute highest priority task",
+                    "Batch small admin tasks",
+                    "Review progress",
+                ],
+                "evening": [
+                    "Reflect on what worked",
+                    "Plan tomorrow",
+                    "Close unfinished loops",
+                ],
+                "recurring": ["Daily planning check-in"],
+            },
+            "medium-method": {
+                "days": [
+                    {"day": "Day 1", "label": "Day 1", "mainTask": "Clarify priorities", "supportTasks": ["List blockers", "Choose one task"]},
+                    {"day": "Day 2", "label": "Day 2", "mainTask": "Execute core work", "supportTasks": ["Start focused block", "Review progress"]},
+                    {"day": "Day 3", "label": "Day 3", "mainTask": "Stabilize system", "supportTasks": ["Clean backlog", "Plan next cycle"]},
+                ],
+            },
+            "okrs": {
+                "objective": "Create clearer progress from current responsibilities",
+                "keyResults": [
+                    {"kr": "Finish 3 priority tasks", "metric": "3 tasks completed", "progress": 0},
+                    {"kr": "Reduce backlog by 30%", "metric": "backlog reduction", "progress": 0},
+                    {"kr": "Complete one focused work session daily", "metric": "focus sessions", "progress": 0},
+                ],
+            },
+            "weekly-review": {
+                "winsThisWeek": ["Captured current responsibilities"],
+                "lessonsLearned": ["Unclear priorities create friction"],
+                "nextWeekFocus": [
+                    "Choose fewer priorities",
+                    "Schedule deep work",
+                    "Review progress daily",
+                ],
+            },
+            "commitment-inventory": {
+                "commitments": [
+                    {
+                        "name": "Current main responsibility",
+                        "urgency": "high",
+                        "category": "work",
+                        "recommendation": "continue",
+                        "reason": "This appears connected to your current pressure.",
+                    },
+                    {
+                        "name": "Low-value distractions",
+                        "urgency": "low",
+                        "category": "personal",
+                        "recommendation": "drop",
+                        "reason": "This may reduce focus.",
+                    },
+                    {
+                        "name": "Pending personal maintenance",
+                        "urgency": "medium",
+                        "category": "personal",
+                        "recommendation": "schedule",
+                        "reason": "Small tasks should be planned instead of carried mentally.",
+                    },
+                ],
+            },
+            "smart-goals": {
+                "goals": [
+                    {
+                        "title": "Complete today's most important task",
+                        "specific": "Choose one concrete task and finish it",
+                        "measurable": "Task marked complete",
+                        "achievable": "Can be done in one focused session",
+                        "relevant": "Reduces current mental load",
+                        "timeBound": "Today",
+                        "progress": 0,
+                    },
+                ],
+            },
+            "para": {
+                "projects": ["Current active mission"],
+                "areas": ["Personal productivity", "Responsibilities"],
+                "resources": ["Notes from brain dump", "Generated action plan"],
+                "archives": [],
+            },
+            "deep-work": {
+                "focusGoal": "Make progress on the highest-value task",
+                "deepBlocks": [
+                    {"start": "09:00", "end": "10:30", "task": "Deep focus on main task"},
+                    {"start": "14:00", "end": "15:00", "task": "Continue focused execution"},
+                ],
+                "shallowTasks": [
+                    "Reply to simple messages",
+                    "Organize notes",
+                    "Review task list",
+                ],
+                "distractions": [
+                    "Social media",
+                    "Unplanned task switching",
+                ],
+                "shutdownRitual": [
+                    "Review what was completed",
+                    "Write next action",
+                    "Close workspace",
+                ],
+            },
+            "pareto": {
+                "highImpact": [
+                    "Identify the one task with the biggest payoff",
+                    "Work on the task that unlocks other tasks",
+                    "Finish the action closest to deadline or goal impact",
+                ],
+                "maintenance": ["Handle small admin tasks later"],
+                "eliminate": [
+                    "Remove one low-value distraction",
+                    "Postpone non-critical work",
+                ],
+                "leverage": [
+                    "Batch similar tasks",
+                    "Reuse existing notes or templates",
+                ],
+            },
+        }
+        return fallbacks.get(framework_id, fallbacks["gtd"])
+
+    def _framework_meets_minimum(self, framework_id: str, data: dict) -> bool:
+        if self.count_actionable_items(framework_id, data) < 3:
+            return False
+
+        if framework_id == "gtd":
+            return self._count_list(data.get("inbox")) >= 3 and self._count_list(data.get("nextActions")) >= 3 and self._count_list(data.get("projects")) >= 1
+        if framework_id == "kanban":
+            return self._count_list(data.get("backlog") or data.get("todo")) >= 3
+        if framework_id == "time-blocking":
+            return self._count_list(data.get("schedule")) >= 3
+        if framework_id == "eat-the-frog":
+            return self._has_actionable_value(data.get("frog")) and self._count_list(data.get("secondaryTasks")) >= 3
+        if framework_id == "pomodoro":
+            return self._count_list(data.get("tasks")) >= 3
+        if framework_id == "eisenhower":
+            return self.count_actionable_items(framework_id, data) >= 3
+        if framework_id == "systemist":
+            return self._count_list(data.get("morning")) > 0 and self._count_list(data.get("workTasks")) > 0 and self._count_list(data.get("evening")) > 0
+        if framework_id == "medium-method":
+            days = data.get("days")
+            return isinstance(days, list) and len(days) >= 3 and all(isinstance(day, dict) and self._has_actionable_value(day.get("mainTask")) and self._count_list(day.get("supportTasks")) > 0 for day in days[:3])
+        if framework_id == "okrs":
+            return self._has_actionable_value(data.get("objective")) and self._count_list(data.get("keyResults")) >= 3
+        if framework_id == "weekly-review":
+            return self._count_list(data.get("winsThisWeek")) > 0 and self._count_list(data.get("lessonsLearned")) > 0 and self._count_list(data.get("nextWeekFocus")) >= 3
+        if framework_id == "commitment-inventory":
+            return self._count_list(data.get("commitments")) >= 3
+        if framework_id == "smart-goals":
+            return self._count_list(data.get("goals")) >= 1 and self.count_actionable_items(framework_id, data) >= 3
+        if framework_id == "para":
+            return self._count_list(data.get("projects")) > 0 and self._count_list(data.get("areas")) > 0 and self._count_list(data.get("resources")) > 0 and isinstance(data.get("archives", []), list)
+        if framework_id == "deep-work":
+            return self._has_actionable_value(data.get("focusGoal")) and self._count_list(data.get("deepBlocks")) > 0 and self._count_list(data.get("shallowTasks")) > 0 and self._count_list(data.get("distractions")) > 0 and self._count_list(data.get("shutdownRitual")) > 0
+        if framework_id == "pareto":
+            return all(self._count_list(data.get(key)) > 0 for key in ("highImpact", "maintenance", "eliminate", "leverage"))
+
+        return True
+
+    def _has_actionable_value(self, value: object) -> bool:
+        if isinstance(value, str):
+            return bool(value.strip())
+        if isinstance(value, dict):
+            for key in ("title", "task", "name", "kr", "mainTask", "specific", "focusGoal"):
+                if self._has_actionable_value(value.get(key)):
+                    return True
+            if "tasks" in value and self._count_list(value.get("tasks")) > 0:
+                return True
+            return False
+        return value is not None
+
+    def _count_list(self, value: object) -> int:
+        if not isinstance(value, list):
+            return 0
+        return sum(1 for item in value if self._has_actionable_value(item))
+
+    def _count_projects(self, value: object) -> int:
+        if not isinstance(value, list):
+            return 0
+        count = 0
+        for project in value:
+            if self._has_actionable_value(project):
+                count += 1
+            if isinstance(project, dict):
+                count += self._count_list(project.get("tasks"))
         return count
 
-    def _inject_fallback_tasks(self, framework_id: str, data: dict, needed: int):
-        """Inject generic but helpful tasks into the framework structure."""
-        fallbacks = [
-            {"title": "Clarify today's top priority", "priority": "high", "estimatedMinutes": 15, "category": "General"},
-            {"title": "Break main goal into smaller steps", "priority": "medium", "estimatedMinutes": 30, "category": "General"},
-            {"title": "Schedule a focused work session", "priority": "high", "estimatedMinutes": 60, "category": "Deep Work"},
-            {"title": "Review and organize current backlog", "priority": "low", "estimatedMinutes": 20, "category": "Admin"},
-            {"title": "Identify next immediate action", "priority": "critical", "estimatedMinutes": 10, "category": "General"}
+    def _ensure_today_actions(self, framework_id: str, today_actions: object, data: dict) -> list:
+        actions = [a.strip() for a in today_actions if isinstance(a, str) and a.strip()] if isinstance(today_actions, list) else []
+        if len(actions) >= 3:
+            return actions[:5]
+
+        extracted = self._extract_action_titles(framework_id, data)
+        for title in extracted:
+            if title not in actions:
+                actions.append(title)
+            if len(actions) >= 3:
+                break
+        return actions[:5]
+
+    def _extract_action_titles(self, framework_id: str, data: dict) -> list[str]:
+        titles: list[str] = []
+
+        def add(value: object):
+            if isinstance(value, str) and value.strip():
+                titles.append(value.strip())
+            elif isinstance(value, dict):
+                for key in ("title", "task", "name", "kr", "mainTask"):
+                    val = value.get(key)
+                    if isinstance(val, str) and val.strip():
+                        titles.append(val.strip())
+                        return
+
+        if framework_id == "time-blocking":
+            for block in data.get("schedule", []):
+                add(block.get("task") if isinstance(block, dict) else block)
+        elif framework_id == "eat-the-frog":
+            add(data.get("frog"))
+            for item in data.get("secondaryTasks", []):
+                add(item)
+        elif framework_id == "okrs":
+            for item in data.get("keyResults", []):
+                add(item)
+        elif framework_id == "weekly-review":
+            for item in data.get("nextWeekFocus", []):
+                add(item)
+        else:
+            for value in data.values():
+                if isinstance(value, list):
+                    for item in value:
+                        add(item)
+                        if isinstance(item, dict):
+                            for nested in item.get("tasks", []) if isinstance(item.get("tasks"), list) else []:
+                                add(nested)
+                else:
+                    add(value)
+
+        return titles or [
+            "Clarify today's top priority",
+            "Break the main goal into smaller steps",
+            "Schedule a focused work session",
         ]
-        
-        # Take only what is needed
-        to_add = fallbacks[:needed]
-        
-        # Simple injection mapping
-        try:
-            if framework_id == 'gtd':
-                data.setdefault('nextActions', []).extend(to_add)
-            elif framework_id == 'kanban':
-                data.setdefault('backlog', []).extend(to_add)
-            elif framework_id == 'time-blocking':
-                for i, task in enumerate(to_add):
-                    data.setdefault('schedule', []).append({
-                        "time": f"{9 + i}:00", "task": task["title"], "duration": 60, "category": "work", "priority": "medium"
-                    })
-            elif framework_id == 'eat-the-frog':
-                data.setdefault('secondaryTasks', []).extend(to_add)
-            elif framework_id == 'pomodoro':
-                for task in to_add:
-                    data.setdefault('tasks', []).append({
-                        "title": task["title"], "duration": 25, "breakDuration": 5, "sessions": 2
-                    })
-            elif framework_id == 'eisenhower':
-                data.setdefault('doNow', []).extend(to_add)
-            elif framework_id == 'systemist':
-                data.setdefault('workTasks', []).extend(to_add)
-            elif framework_id == 'medium-method':
-                if not data.get('days'):
-                    data['days'] = [{"label": "Hari Ini", "mainTask": to_add[0], "supportTasks": to_add[1:]}]
-                else:
-                    data['days'][0].setdefault('supportTasks', []).extend(to_add)
-            elif framework_id == 'okrs':
-                for task in to_add:
-                    data.setdefault('keyResults', []).append({
-                        "kr": task["title"], "metric": "Completed", "deadline": "Next week", "progress": 0
-                    })
-            elif framework_id == 'weekly-review':
-                data.setdefault('nextWeekFocus', []).extend([t["title"] for t in to_add])
-            elif framework_id == 'commitment-inventory':
-                for task in to_add:
-                    data.setdefault('commitments', []).append({
-                        "name": task["title"], "urgency": "medium", "category": "work", "recommendation": "continue", "reason": "Self-identified priority"
-                    })
-            elif framework_id == 'smart-goals':
-                for task in to_add:
-                    data.setdefault('goals', []).append({
-                        "title": task["title"], "specific": "Actionable step", "measurable": "Done/Not Done", "achievable": "Yes", "relevant": "Core goal", "timeBound": "Today", "progress": 0
-                    })
-            elif framework_id == 'para':
-                if not data.get('projects'):
-                    data['projects'] = [{"name": "Main Mission", "description": "Active goal", "tasks": to_add}]
-                else:
-                    data['projects'][0].setdefault('tasks', []).extend(to_add)
-            elif framework_id == 'deep-work':
-                data.setdefault('shallowTasks', []).extend(to_add)
-            elif framework_id == 'pareto':
-                data.setdefault('highImpact', []).extend(to_add)
-        except Exception:
-            pass
 
     def _parse_and_validate_dashboard(self, json_str: str) -> dict:
         data = json.loads(json_str)
@@ -437,29 +754,76 @@ class GeminiService:
         except Exception as e:
             print(f"Error generating subtasks: {e}")
             return []
-    async def generate_more_tasks(self, session_id: str, existing_tasks: list, context: str) -> list:
+    async def generate_more_tasks(
+        self,
+        session_id: str,
+        existing_tasks: list,
+        context: str,
+        framework_id: Optional[str] = None,
+        framework_data: Optional[dict] = None,
+        completed_tasks: Optional[list] = None,
+    ) -> list:
         """Generate 3-5 additional tasks based on story context and existing tasks."""
         existing_titles = [t.get("title", "") for t in existing_tasks]
-        
-        prompt = f"""
-        User Story Context: "{context}"
-        Current Task List: {json.dumps(existing_titles)}
+        completed_titles = [t.get("title", "") for t in completed_tasks or []]
 
-        You are Moti, the AI Productivity Mascot.
-        The user has completed all their current tasks and needs more momentum!
-        
-        Your goal:
-        Generate 3-5 NEW tasks that are relevant to their story but NOT already in the list above.
-        
-        Task Requirements:
-        - Title: Action-oriented, concise.
-        - Description: Brief explanation of why this is important.
-        - Priority: low, medium, high, or critical.
-        - EstimatedMinutes: 5 to 480.
-        - Category: e.g. Work, Study, Personal, Health.
+        if framework_id == "eisenhower":
+            prompt = f"""
+            User Story Context: "{context}"
+            Current Eisenhower Matrix Data: {json.dumps(framework_data or {}, ensure_ascii=False)}
+            Existing Task Titles: {json.dumps(existing_titles, ensure_ascii=False)}
+            Completed Task Titles: {json.dumps(completed_titles, ensure_ascii=False)}
 
-        Return ONLY a JSON object with the key "newTasks" containing a list of task objects.
-        """
+            You are Moti, the AI Productivity Mascot.
+            The user completed the current Eisenhower Matrix tasks and needs more useful momentum.
+
+            Generate 3-5 NEW Eisenhower Matrix tasks.
+
+            Rules:
+            - Do not repeat any existing or completed task title.
+            - Every task must be concrete, short, and action-oriented.
+            - Put each task in the right quadrant using one of:
+              "doNow", "schedule", "delegate", "eliminate".
+            - Prefer practical next steps inferred from the story and current matrix.
+            - If the story is vague, infer useful starter actions.
+
+            Return ONLY a JSON object:
+            {{
+              "newTasks": [
+                {{
+                  "title": "Concrete action",
+                  "description": "Brief reason or context",
+                  "priority": "critical|high|medium|low",
+                  "estimatedMinutes": 5,
+                  "category": "work",
+                  "quadrant": "doNow|schedule|delegate|eliminate"
+                }}
+              ]
+            }}
+            """
+        else:
+            prompt = f"""
+            User Story Context: "{context}"
+            Framework: "{framework_id or "dashboard"}"
+            Current Framework Data: {json.dumps(framework_data or {}, ensure_ascii=False)}
+            Current Task List: {json.dumps(existing_titles, ensure_ascii=False)}
+            Completed Task Titles: {json.dumps(completed_titles, ensure_ascii=False)}
+
+            You are Moti, the AI Productivity Mascot.
+            The user has completed all their current tasks and needs more momentum.
+
+            Your goal:
+            Generate 3-5 NEW framework-specific tasks that are relevant to their story but NOT already in the list above.
+
+            Task Requirements:
+            - Title: Action-oriented, concise.
+            - Description: Brief explanation of why this is important.
+            - Priority: low, medium, high, or critical.
+            - EstimatedMinutes: 5 to 480.
+            - Category: e.g. Work, Study, Personal, Health.
+
+            Return ONLY a JSON object with the key "newTasks" containing a list of task objects.
+            """
 
         try:
             response_text = await self._call_gemini(

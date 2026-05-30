@@ -19,10 +19,13 @@ import { useFramework }        from '@/store/usePTStore';
    ============================================ */
 
 interface KR {
+  id?:       string;
   kr:       string;
   metric:   string;
   deadline: string;
   progress: number;
+  isCompleted?: boolean;
+  completed?: boolean;
 }
 
 interface OKRRawData {
@@ -44,12 +47,7 @@ export function OKRView() {
     : 0;
 
   if (!fwData || !rawData.objective) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="okrs"
-        message="Moti tidak bisa mengidentifikasi Objective dari ceritamu. Sebutkan tujuan besar yang ingin kamu capai dalam ceritamu."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="okrs" />;
   }
 
   return (
@@ -97,11 +95,13 @@ export function OKRView() {
           <div className="space-y-4">
             {keyResults.map((kr, i) => (
               <KeyResultRow
-                key={i}
+                key={kr.id ?? i}
+                id={kr.id}
                 kr={kr.kr}
                 metric={kr.metric}
                 deadline={kr.deadline}
                 progress={kr.progress ?? 0}
+                isCompleted={Boolean(kr.isCompleted ?? kr.completed ?? (kr.progress ?? 0) >= 100)}
                 index={i}
               />
             ))}
@@ -112,7 +112,7 @@ export function OKRView() {
           className="text-sm text-center py-4"
           style={{ fontFamily: 'var(--font-body)', color: '#9B9B9B' }}
         >
-          Tidak ada Key Results yang teridentifikasi.
+          Key Results will appear here after generation.
         </p>
       )}
 

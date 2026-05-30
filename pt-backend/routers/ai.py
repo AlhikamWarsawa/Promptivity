@@ -146,13 +146,23 @@ async def add_more_tasks(body: dict):
     session_id     = body.get("sessionId")
     existing_tasks = body.get("existingTasks", [])
     story_context  = body.get("storyContext", "")
+    framework_id   = body.get("frameworkId")
+    framework_data = body.get("frameworkData", {})
+    completed_tasks = body.get("completedTasks", [])
     
     if not session_id:
         raise HTTPException(status_code=400, detail="Missing sessionId")
         
     try:
         gemini = get_gemini_service()
-        new_tasks = await gemini.generate_more_tasks(session_id, existing_tasks, story_context)
+        new_tasks = await gemini.generate_more_tasks(
+            session_id,
+            existing_tasks,
+            story_context,
+            framework_id=framework_id,
+            framework_data=framework_data,
+            completed_tasks=completed_tasks,
+        )
         return {"success": True, "newTasks": new_tasks}
     except Exception as e:
         return {"success": False, "error": str(e)}

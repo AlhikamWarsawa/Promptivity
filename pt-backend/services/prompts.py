@@ -13,6 +13,7 @@ BASE_RULES = """
 4. ACTIONABILITY: Every task title starts with a verb.
 5. TASK COUNT: Always return at least 3 tasks and at most 8 tasks for every framework.
 6. VAGUE INPUT: If user input is vague, infer practical starter tasks from the framework's core philosophy.
+7. NEVER EMPTY: Never return empty arrays for the primary task/action fields. If the story is vague, create useful starter actions.
 """
 
 # --- Dashboard Prompt ---
@@ -101,9 +102,29 @@ Output language MUST match the user's input language.
 - If preferredStyle is "structured", task descriptions should be more precise.
 
 ## TASK REQUIREMENTS
-- Every framework page MUST have at least 3 actionable tasks.
+- Every framework page MUST have at least 3 actionable tasks or concrete actions.
 - Maximum 8 tasks.
-- If the user story doesn't provide enough details, generate practical starter actions relevant to the framework (e.g., "Clarify today's top priority" or "Set up environment").
+- If the user story is vague, infer practical starter actions from the raw story, dashboard tasks, user personalization, current session context, and framework context.
+- Never return empty arrays for required fields. Never say that data cannot be identified.
+- Do not ask the user to provide more specific tasks. Help them with reasonable starter tasks.
+- Avoid duplicate task titles.
+
+## REQUIRED MINIMUM CONTENT BY FRAMEWORK
+- gtd: inbox has 3 items, nextActions has 3 items, projects has at least 1 project.
+- kanban: backlog has at least 3 cards.
+- time-blocking: schedule has at least 3 blocks.
+- eat-the-frog: frog is present with a reason, and secondaryTasks has at least 3 items.
+- pomodoro: tasks has at least 3 items, each with sessions, duration, and breakDuration.
+- eisenhower: at least 3 total tasks across doNow, schedule, delegate, and eliminate.
+- systemist: morning, workTasks, and evening are all present.
+- medium-method: days has exactly 3 days; each day has mainTask and supportTasks.
+- okrs: objective is present and keyResults has 3 items.
+- weekly-review: winsThisWeek, lessonsLearned, and nextWeekFocus are all present.
+- commitment-inventory: commitments has at least 3 items.
+- smart-goals: goals has at least 1 complete SMART goal.
+- para: projects, areas, resources, and archives are all present.
+- deep-work: focusGoal, deepBlocks, shallowTasks, distractions, and shutdownRitual are all present.
+- pareto: highImpact, maintenance, eliminate, and leverage are all present.
 
 ## FINAL JSON OUTPUT STRUCTURE
 {{
@@ -123,8 +144,39 @@ def build_user_prompt(story: str, personalization: Optional[dict] = None) -> str
     
     return f"{persona_context}## USER STORY\n\n{story}\n\n---"
 
-def build_framework_prompt(story: str, framework_id: str, personalization: Optional[dict] = None) -> str:
-    return f"{build_user_prompt(story, personalization)}\n\nGenerate deep-dive data for framework: {framework_id}. Output JSON."
+def build_framework_prompt(
+    story: str,
+    framework_id: str,
+    personalization: Optional[dict] = None,
+    dashboard_tasks: Optional[list] = None,
+    today_plan: Optional[list] = None,
+) -> str:
+    dashboard_context = ""
+    if dashboard_tasks:
+        lines = ["## DASHBOARD TASKS"]
+        for task in dashboard_tasks[:8]:
+            if isinstance(task, dict):
+                title = task.get("title") or task.get("task") or task.get("name")
+                if title:
+                    lines.append(f"- {title}")
+            elif isinstance(task, str) and task.strip():
+                lines.append(f"- {task.strip()}")
+        dashboard_context += "\n".join(lines) + "\n\n"
+
+    if today_plan:
+        lines = ["## CURRENT SESSION TODAY PLAN"]
+        for action in today_plan[:5]:
+            if isinstance(action, str) and action.strip():
+                lines.append(f"- {action.strip()}")
+        dashboard_context += "\n".join(lines) + "\n\n"
+
+    return (
+        f"{build_user_prompt(story, personalization)}\n\n"
+        f"{dashboard_context}"
+        f"Generate deep-dive data for framework: {framework_id}. "
+        "Even if the story is vague, infer practical starter tasks. "
+        "Never return empty arrays. Output JSON."
+    )
 # --- Confused Mode Prompts ---
 CONFUSED_MODE_SYSTEM_PROMPT = """
 You are Moti, a warm and empathetic productivity psychologist.

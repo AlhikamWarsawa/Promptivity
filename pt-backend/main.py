@@ -4,7 +4,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from schemas.responses import HealthResponse
-from routers import ai, auth, sessions
+from routers import ai
 
 # ============================================
 # Promptivity — FastAPI Backend
@@ -13,7 +13,7 @@ from routers import ai, auth, sessions
 app = FastAPI(
     title       = "Promptivity API",
     description = "Backend API for Promptivity — AI-powered productivity mission builder",
-    version     = "0.1.0",
+    version     = "0.2.0",
     docs_url    = "/docs",
     redoc_url   = "/redoc",
 )
@@ -23,7 +23,6 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3000",
-    # Production URL ditambahkan di Day 22
 ]
 
 app.add_middleware(
@@ -35,9 +34,7 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(ai.router,       prefix="/api",      tags=["AI"])
-app.include_router(auth.router,     prefix="/auth",     tags=["Auth"])
-app.include_router(sessions.router, prefix="/sessions", tags=["Sessions"])
+app.include_router(ai.router, prefix="/api", tags=["AI"])
 
 
 @app.get("/", include_in_schema=False)
@@ -45,10 +42,10 @@ async def root():
     return {
         "app":     "Promptivity",
         "message": "API is running",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "docs":    "/docs",
     }
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    return HealthResponse(status="ok", version="0.1.0")
+    return HealthResponse(status="ok", version="0.2.0")

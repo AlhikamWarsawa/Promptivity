@@ -8,7 +8,7 @@ import { cn }     from '@/lib/utils';
    commitment list (All / Continue / Delegate / Drop)
    ============================================ */
 
-export type FilterType = 'all' | 'continue' | 'delegate' | 'drop';
+export type FilterType = 'all' | 'continue' | 'delegate' | 'schedule' | 'drop';
 
 interface FilterConfig {
   value:    FilterType;
@@ -22,6 +22,7 @@ const FILTERS: FilterConfig[] = [
   { value: 'all',      label: 'Semua',     icon: '📋', color: 'var(--pt-black)',   bgActive: 'var(--pt-black)'   },
   { value: 'continue', label: 'Lanjutkan', icon: '✅', color: 'var(--pt-green)',   bgActive: 'var(--pt-green)'   },
   { value: 'delegate', label: 'Delegasi',  icon: '🤝', color: 'var(--pt-mustard)', bgActive: 'var(--pt-mustard)' },
+  { value: 'schedule', label: 'Jadwalkan', icon: '📅', color: 'var(--pt-blue)',    bgActive: 'var(--pt-blue)'    },
   { value: 'drop',     label: 'Drop',      icon: '🗑️', color: 'var(--pt-coral)',   bgActive: 'var(--pt-coral)'   },
 ];
 

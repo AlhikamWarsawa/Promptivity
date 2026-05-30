@@ -7,6 +7,7 @@ import { ReflectionNotes }     from './ReflectionNotes';
 import { FrameworkEmptyState } from '@/components/frameworks/FrameworkPageLayout';
 import { HandDrawnDivider }    from '@/components/pt/HandDrawnDivider';
 import { useFramework }        from '@/store/usePTStore';
+import type { Task }           from '@/types/pt.types';
 
 /* ============================================
    WeeklyReviewView — Weekly Review framework
@@ -23,7 +24,7 @@ import { useFramework }        from '@/store/usePTStore';
 interface WeeklyReviewRawData {
   winsThisWeek?:   string[];
   lessonsLearned?: string[];
-  nextWeekFocus?:  string[];
+  nextWeekFocus?:  (string | Task)[];
 }
 
 export function WeeklyReviewView() {
@@ -40,12 +41,7 @@ export function WeeklyReviewView() {
     (rawData.nextWeekFocus?.length ?? 0) > 0;
 
   if (!fwData || !hasContent) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="weekly-review"
-        message="Moti tidak menemukan cukup konteks untuk Weekly Review. Ceritakan tentang minggu yang baru lewat — apa yang selesai, apa yang macet."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="weekly-review" />;
   }
 
   // Get week range string
@@ -80,11 +76,11 @@ export function WeeklyReviewView() {
       <motion.div
         variants={itemVariants}
         className="flex items-center gap-4 p-4 rounded-sketch border-2 border-pt-black"
-        style={{ backgroundColor: 'var(--pt-cream)', boxShadow: '3px 3px 0px #2B2B2B' }}
+        style={{ backgroundColor: '#FAF0EC', boxShadow: '3px 3px 0px #2B2B2B' }}
       >
         <div
           className="w-14 h-14 rounded-sketch border-2 border-pt-black flex flex-col items-center justify-center shrink-0"
-          style={{ backgroundColor: 'var(--pt-yellow)' }}
+          style={{ backgroundColor: 'var(--pt-brown)' }}
         >
           <span className="text-xl" aria-hidden="true">📅</span>
         </div>
@@ -137,7 +133,7 @@ export function WeeklyReviewView() {
           items={rawData.winsThisWeek ?? []}
           accentColor="var(--pt-green)"
           bgColor="var(--pt-lime)"
-          emptyText="Moti tidak mendeteksi wins dari ceritamu. Tapi yakinlah — pasti ada hal kecil yang berhasil!"
+          emptyText="Small wins will appear here after generation."
           itemStyle="win"
           defaultOpen={true}
         />
@@ -151,7 +147,7 @@ export function WeeklyReviewView() {
           items={rawData.lessonsLearned ?? []}
           accentColor="var(--pt-mustard)"
           bgColor="var(--pt-yellowP)"
-          emptyText="Tidak ada lesson yang teridentifikasi. Coba refleksikan: apa yang bisa dilakukan berbeda?"
+          emptyText="Lessons will appear here after generation."
           itemStyle="lesson"
           defaultOpen={true}
         />
@@ -173,7 +169,7 @@ export function WeeklyReviewView() {
           items={rawData.nextWeekFocus ?? []}
           accentColor="var(--pt-blue)"
           bgColor="var(--pt-cyan)"
-          emptyText="Tidak ada fokus yang teridentifikasi. Tambahkan di catatan refleksimu di bawah."
+          emptyText="Next focus items will appear here after generation."
           itemStyle="focus"
           defaultOpen={true}
         />
@@ -236,7 +232,7 @@ function WeekStatsBar({
   return (
     <div
       className="grid grid-cols-3 gap-3 rounded-sketch border-2 border-pt-black p-4"
-      style={{ backgroundColor: 'var(--pt-cream)' }}
+      style={{ backgroundColor: '#FAF0EC' }}
     >
       {items.map((item) => (
         <div key={item.label} className="text-center">

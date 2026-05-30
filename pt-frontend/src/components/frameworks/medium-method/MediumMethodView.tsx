@@ -54,12 +54,7 @@ export function MediumMethodView() {
   }, [fwData]);
 
   if (!fwData || days.length === 0) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="medium-method"
-        message="Moti tidak bisa membangun jadwal Medium Method dari ceritamu. Sebutkan apa satu hal terpenting yang perlu kamu selesaikan hari ini."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="medium-method" />;
   }
 
   // Count total tasks across all days

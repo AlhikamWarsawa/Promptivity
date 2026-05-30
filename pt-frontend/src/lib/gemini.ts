@@ -1,5 +1,5 @@
 import type { PTSession, Personalization } from '@/types/pt.types';
-import { parseSession, parseFrameworkOutput, validateSession } from '@/lib/parsers';
+import { parseSession, parseFrameworkOutput } from '@/lib/parsers';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -85,7 +85,7 @@ export async function generateFrameworkAPI(
     if (!body.success) return { success: false, error: body.error };
 
     // Parse the framework-specific output using our existing parser logic
-    const fwOutput = parseFrameworkOutput(frameworkId as any, body.data);
+    const fwOutput = parseFrameworkOutput(frameworkId as any, body.data, { ensureContent: true });
 
     return { success: true, data: fwOutput };
   } catch (error) {

@@ -35,6 +35,7 @@ interface DayCardProps {
 
 export function DayCard({ data, isToday = false, index }: DayCardProps) {
   const toggleTask = usePTStore((s) => s.toggleTask);
+  const mainDone = Boolean(data.mainTask.isCompleted ?? data.mainTask.completed);
 
   return (
     <motion.div
@@ -123,11 +124,21 @@ export function DayCard({ data, isToday = false, index }: DayCardProps) {
             borderLeft:      `5px solid ${isToday ? 'var(--pt-coral)' : 'var(--pt-mustard)'}`,
           }}
         >
+          <button
+            type="button"
+            onClick={() => toggleTask(data.mainTask.id)}
+            className={`float-left mr-3 mt-0.5 w-6 h-6 rounded border-2 border-pt-black flex items-center justify-center text-[12px] font-bold ${mainDone ? 'bg-pt-green border-pt-green text-white' : 'bg-white hover:bg-pt-yellowP'}`}
+            role="checkbox"
+            aria-checked={mainDone}
+            aria-label={mainDone ? `Mark "${data.mainTask.title}" as incomplete` : `Mark "${data.mainTask.title}" as complete`}
+          >
+            {mainDone ? '✓' : ''}
+          </button>
           <p
             className={cn(
               'font-bold leading-snug',
               isToday ? 'text-body' : 'text-sm',
-              data.mainTask.isCompleted && 'line-through opacity-50',
+              mainDone && 'line-through opacity-50',
             )}
             style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
           >

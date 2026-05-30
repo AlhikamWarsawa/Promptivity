@@ -6,7 +6,7 @@ import { RoutineSection }        from './RoutineSection';
 import { CategoryTaskList }      from './CategoryTaskList';
 import { FrameworkEmptyState }   from '@/components/frameworks/FrameworkPageLayout';
 import { HandDrawnDivider }      from '@/components/pt/HandDrawnDivider';
-import { useFramework }          from '@/store/usePTStore';
+import { useFramework, usePTStore } from '@/store/usePTStore';
 import type { Task }             from '@/types/pt.types';
 
 /* ============================================
@@ -21,9 +21,9 @@ import type { Task }             from '@/types/pt.types';
    ============================================ */
 
 interface SystemistRawData {
-  morning?:   string[];
+  morning?:   (string | Task)[];
   workTasks?: Task[];
-  evening?:   string[];
+  evening?:   (string | Task)[];
   recurring?: Task[];
 }
 
@@ -42,12 +42,7 @@ export function SystemistView() {
     (rawData.recurring?.length ?? 0) > 0;
 
   if (!fwData || !hasContent) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="systemist"
-        message="Moti tidak bisa membangun sistem harian dari ceritamu. Coba sebutkan rutinitas harian, jam kerja, dan kegiatan yang kamu lakukan berulang."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="systemist" />;
   }
 
   const containerVariants = {
@@ -199,15 +194,26 @@ export function SystemistView() {
 
 /* ---- Recurring Task Row ---- */
 function RecurringTaskRow({ task }: { task: Task }) {
+  const toggleTask = usePTStore((s) => s.toggleTask);
+  const isCompleted = Boolean(task.isCompleted ?? task.completed);
   return (
     <div
       className="flex items-center gap-3 px-3 py-2 rounded border border-pt-black/15"
       style={{ backgroundColor: 'var(--pt-cream)' }}
     >
-      <span className="text-base shrink-0" aria-hidden="true">🔄</span>
+      <button
+        type="button"
+        onClick={() => toggleTask(task.id)}
+        className={`shrink-0 w-5 h-5 rounded border-2 border-pt-black flex items-center justify-center text-[11px] font-bold ${isCompleted ? 'bg-pt-green border-pt-green text-white' : 'bg-white hover:bg-pt-yellowP'}`}
+        role="checkbox"
+        aria-checked={isCompleted}
+        aria-label={isCompleted ? `Mark "${task.title}" as incomplete` : `Mark "${task.title}" as complete`}
+      >
+        {isCompleted ? '✓' : ''}
+      </button>
       <div className="flex-1 min-w-0">
         <p
-          className="text-sm font-semibold truncate"
+          className={`text-sm font-semibold truncate ${isCompleted ? 'line-through opacity-50' : ''}`}
           style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
         >
           {task.title}

@@ -32,7 +32,6 @@ export default function OnboardingDecisionPage() {
     if (!existing) {
       PTStorage.savePersona(PTStorage.DEFAULT_PERSONA);
     }
-    PTStorage.setSkipLogin();
     router.push('/onboarding/input-method');
   }
 

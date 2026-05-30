@@ -22,6 +22,7 @@ interface PomodoroTask {
   sessions:      number;
   completedSessions: number;
   isCompleted?:  boolean;
+  completed?:    boolean;
 }
 
 export function PomodoroView() {
@@ -68,16 +69,16 @@ export function PomodoroView() {
   // Sequential Queue Logic
   // First task that is not completed is the active task
   const activeTask = useMemo(() => {
-    return tasks.find(t => !t.isCompleted);
+    return tasks.find(t => !(t.isCompleted ?? t.completed));
   }, [tasks]);
 
   const upcomingTasks = useMemo(() => {
-    if (!activeTask) return tasks.filter(t => !t.isCompleted);
-    return tasks.filter(t => !t.isCompleted && t.id !== activeTask.id);
+    if (!activeTask) return tasks.filter(t => !(t.isCompleted ?? t.completed));
+    return tasks.filter(t => !(t.isCompleted ?? t.completed) && t.id !== activeTask.id);
   }, [tasks, activeTask]);
 
   const totalSessionsInQueue = useMemo(() => {
-    return tasks.filter(t => !t.isCompleted).reduce((acc, t) => acc + (t.sessions - t.completedSessions), 0);
+    return tasks.filter(t => !(t.isCompleted ?? t.completed)).reduce((acc, t) => acc + (t.sessions - t.completedSessions), 0);
   }, [tasks]);
 
   const completedSessionsTotal = useMemo(() => {
@@ -321,7 +322,7 @@ export function PomodoroView() {
                     ✓ Complete Session
                   </PTButton>
                   <PTButton variant="ghost" size="sm" onClick={() => togglePomTask(activeTask.id)}>
-                    {activeTask.isCompleted ? 'Reopen' : 'Skip Task'}
+                    {Boolean(activeTask.isCompleted ?? activeTask.completed) ? 'Reopen' : 'Skip Task'}
                   </PTButton>
                 </div>
               </div>
@@ -494,11 +495,11 @@ export function PomodoroView() {
                   <input 
                     type="checkbox" 
                     className="w-5 h-5 accent-pt-coral cursor-pointer"
-                    checked={task.isCompleted} 
+                    checked={Boolean(task.isCompleted ?? task.completed)}
                     onChange={() => togglePomTask(task.id)} 
                   />
                   <div className="flex-1">
-                    <p className={`font-bold text-sm ${task.isCompleted ? 'line-through text-gray-400' : 'text-pt-black'}`}>{task.title}</p>
+                    <p className={`font-bold text-sm ${Boolean(task.isCompleted ?? task.completed) ? 'line-through text-gray-400' : 'text-pt-black'}`}>{task.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <p className="text-xs text-gray-500">{task.completedSessions}/{task.sessions} sessions</p>
                       <div className="flex gap-0.5">

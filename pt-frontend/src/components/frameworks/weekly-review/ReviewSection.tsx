@@ -3,6 +3,8 @@
 import { useState }                from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn }                      from '@/lib/utils';
+import { usePTStore }              from '@/store/usePTStore';
+import type { Task }               from '@/types/pt.types';
 
 /* ============================================
    ReviewSection — Collapsible section untuk
@@ -15,7 +17,7 @@ import { cn }                      from '@/lib/utils';
 interface ReviewSectionProps {
   title:       string;
   icon:        string;
-  items:       string[];
+  items:       (string | Task)[];
   accentColor: string;
   bgColor:     string;
   emptyText:   string;
@@ -31,6 +33,7 @@ export function ReviewSection({
   itemStyle   = 'win',
 }: ReviewSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const toggleTask = usePTStore((s) => s.toggleTask);
 
   // Item prefix icon per style
   const PREFIX: Record<string, string> = {
@@ -107,9 +110,14 @@ export function ReviewSection({
                   {emptyText}
                 </p>
               ) : (
-                items.map((item, i) => (
+                items.map((item, i) => {
+                  const isTask = typeof item !== 'string';
+                  const title = isTask ? item.title : item;
+                  const isCompleted = isTask ? Boolean(item.isCompleted ?? item.completed) : false;
+
+                  return (
                   <motion.div
-                    key={i}
+                    key={isTask ? item.id : `${item}-${i}`}
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05, duration: 0.3 }}
@@ -118,32 +126,44 @@ export function ReviewSection({
                     )}
                     style={{ backgroundColor: bgColor + '60' }}
                   >
-                    {/* Prefix icon */}
-                    <span
-                      className="shrink-0 text-base mt-0.5"
-                      aria-hidden="true"
-                    >
-                      {itemStyle === 'focus' ? (
-                        <span
-                          className="font-bold text-sm"
-                          style={{ color: accentColor }}
-                        >
-                          {i + 1}.
-                        </span>
-                      ) : (
-                        prefix
-                      )}
-                    </span>
+                    {isTask ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleTask(item.id)}
+                        className={`shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-pt-black flex items-center justify-center text-[11px] font-bold ${isCompleted ? 'bg-pt-green border-pt-green text-white' : 'bg-white hover:bg-pt-yellowP'}`}
+                        role="checkbox"
+                        aria-checked={isCompleted}
+                        aria-label={isCompleted ? `Mark "${title}" as incomplete` : `Mark "${title}" as complete`}
+                      >
+                        {isCompleted ? '✓' : ''}
+                      </button>
+                    ) : (
+                      <span
+                        className="shrink-0 text-base mt-0.5"
+                        aria-hidden="true"
+                      >
+                        {itemStyle === 'focus' ? (
+                          <span
+                            className="font-bold text-sm"
+                            style={{ color: accentColor }}
+                          >
+                            {i + 1}.
+                          </span>
+                        ) : (
+                          prefix
+                        )}
+                      </span>
+                    )}
 
-                    {/* Item text */}
                     <p
-                      className="text-sm leading-relaxed"
+                      className={`text-sm leading-relaxed ${isCompleted ? 'line-through opacity-50' : ''}`}
                       style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
                     >
-                      {item}
+                      {title}
                     </p>
                   </motion.div>
-                ))
+                  );
+                })
               )}
             </div>
           </motion.div>

@@ -4,6 +4,7 @@ import { useState }                from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PARAItem, PARAItemType }  from './PARAItem';
 import { cn }                      from '@/lib/utils';
+import type { Task }               from '@/types/pt.types';
 
 /* ============================================
    PARASection — One of the 4 PARA buckets.
@@ -16,9 +17,12 @@ import { cn }                      from '@/lib/utils';
    ============================================ */
 
 interface PARAItemData {
+  id?:          string;
   name:        string;
   description: string;
-  tasks?:      Array<{ title: string; isCompleted?: boolean }>;
+  tasks?:      Task[];
+  isCompleted?: boolean;
+  completed?:  boolean;
 }
 
 interface SectionConfig {
@@ -202,11 +206,14 @@ export function PARASection({
               ) : (
                 items.map((item, i) => (
                   <PARAItem
-                    key={i}
+                    key={item.id ?? i}
+                    id={item.id}
                     name={item.name}
                     description={item.description}
                     type={sectionId}
                     tasks={item.tasks ?? []}
+                    isCompleted={item.isCompleted}
+                    completed={item.completed}
                     index={i}
                     accentColor={config.accentColor}
                   />

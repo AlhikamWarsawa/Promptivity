@@ -17,18 +17,20 @@ import { usePTStore }               from '@/store/usePTStore';
    ============================================ */
 
 interface KeyResultRowProps {
+  id?:       string;
   kr:       string;
   metric:   string;
   deadline: string;
   progress: number;
+  isCompleted?: boolean;
   index:    number;
 }
 
 export function KeyResultRow({
-  kr, metric, deadline, progress, index,
+  kr, metric, deadline, progress, isCompleted, index,
 }: KeyResultRowProps) {
   const updateKRProgress = usePTStore((s) => s.updateKRProgress);
-  const [localProgress, setLocalProgress] = useState(progress);
+  const [localProgress, setLocalProgress] = useState(isCompleted ? 100 : progress);
   const [isDragging, setIsDragging]       = useState(false);
 
   const handleSliderChange = useCallback(
@@ -62,6 +64,13 @@ export function KeyResultRow({
   }
 
   const progressColor = getProgressColor();
+  const done = localProgress >= 100;
+
+  function handleToggleComplete() {
+    const next = done ? 0 : 100;
+    setLocalProgress(next);
+    updateKRProgress(index, next);
+  }
 
   return (
     <motion.div
@@ -79,19 +88,24 @@ export function KeyResultRow({
         {/* KR number + text */}
         <div className="flex items-start gap-3 mb-3">
           {/* Index pill */}
-          <span
-            className="shrink-0 w-6 h-6 rounded-sketch border-2 border-pt-black flex items-center justify-center text-label font-bold mt-0.5"
+          <button
+            type="button"
+            onClick={handleToggleComplete}
+            className="shrink-0 w-7 h-7 rounded-sketch border-2 border-pt-black flex items-center justify-center text-label font-bold mt-0.5 transition-colors"
             style={{
               backgroundColor: progressColor,
               color:           localProgress > 0 ? 'white' : 'var(--pt-black)',
               fontFamily:      'var(--font-body)',
             }}
+            role="checkbox"
+            aria-checked={done}
+            aria-label={done ? `Mark "${kr}" as incomplete` : `Mark "${kr}" as complete`}
           >
-            {index + 1}
-          </span>
+            {done ? '✓' : index + 1}
+          </button>
           <div className="flex-1">
             <p
-              className="font-semibold leading-snug"
+              className={`font-semibold leading-snug ${done ? 'line-through opacity-60' : ''}`}
               style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
             >
               {kr}

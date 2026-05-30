@@ -11,6 +11,7 @@ import { usePTStore }              from '@/store/usePTStore';
    ============================================ */
 
 interface SMARTGoal {
+  id?:         string;
   title:      string;
   specific:   string;
   measurable: string;
@@ -18,6 +19,8 @@ interface SMARTGoal {
   relevant:   string;
   timeBound:  string;
   progress:   number;
+  isCompleted?: boolean;
+  completed?:   boolean;
 }
 
 interface SMARTGoalCardProps {
@@ -29,7 +32,7 @@ interface SMARTGoalCardProps {
 export function SMARTGoalCard({ goal, goalIndex, totalGoals }: SMARTGoalCardProps) {
   const updateGoalProgress          = usePTStore((s) => s.updateGoalProgress);
   const [isExpanded, setIsExpanded] = useState(goalIndex === 0);   // First goal open by default
-  const [localProgress, setLocal]   = useState(goal.progress ?? 0);
+  const [localProgress, setLocal]   = useState(goal.isCompleted || goal.completed ? 100 : goal.progress ?? 0);
 
   const criteria = buildSMARTCriteria(goal);
   const completeCriteria = criteria.filter((c) => !c.isEmpty).length;
@@ -51,6 +54,14 @@ export function SMARTGoalCard({ goal, goalIndex, totalGoals }: SMARTGoalCardProp
   }, [goalIndex, localProgress, updateGoalProgress]);
 
   const progressColor = getProgressColor();
+  const isDone = localProgress >= 100;
+
+  function handleToggleGoal(e: React.MouseEvent) {
+    e.stopPropagation();
+    const next = isDone ? 0 : 100;
+    setLocal(next);
+    updateGoalProgress(goalIndex, next);
+  }
 
   return (
     <motion.div
@@ -72,24 +83,27 @@ export function SMARTGoalCard({ goal, goalIndex, totalGoals }: SMARTGoalCardProp
         }}
         aria-expanded={isExpanded}
       >
-        {/* Goal number */}
+        {/* Goal completion */}
         <div
           className="shrink-0 w-10 h-10 rounded-sketch border-2 border-pt-black flex items-center justify-center font-bold text-sm mt-0.5"
           style={{
             fontFamily:      'var(--font-display)',
-            backgroundColor: localProgress === 100 ? 'var(--pt-green)' : 'var(--pt-yellow)',
+            backgroundColor: isDone ? 'var(--pt-green)' : 'var(--pt-yellow)',
             color:           'var(--pt-black)',
             fontSize:        '1.1rem',
           }}
-          aria-hidden="true"
+          role="checkbox"
+          aria-checked={isDone}
+          aria-label={isDone ? `Mark "${goal.title}" as incomplete` : `Mark "${goal.title}" as complete`}
+          onClick={handleToggleGoal}
         >
-          {localProgress === 100 ? '✓' : goalIndex + 1}
+          {isDone ? '✓' : goalIndex + 1}
         </div>
 
         <div className="flex-1 min-w-0">
           {/* Title */}
           <h3
-            className="leading-snug mb-2"
+            className={`leading-snug mb-2 ${isDone ? 'line-through opacity-60' : ''}`}
             style={{
               fontFamily: 'var(--font-display)',
               fontSize:   'var(--text-h4)',

@@ -18,6 +18,7 @@ import { useFramework }        from '@/store/usePTStore';
    ============================================ */
 
 interface SMARTGoal {
+  id?:         string;
   title:      string;
   specific:   string;
   measurable: string;
@@ -25,6 +26,8 @@ interface SMARTGoal {
   relevant:   string;
   timeBound:  string;
   progress:   number;
+  isCompleted?: boolean;
+  completed?:   boolean;
 }
 
 interface SMARTRawData {
@@ -41,12 +44,7 @@ export function SMARTGoalsView() {
   }, [fwData]);
 
   if (!fwData || goals.length === 0) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="smart-goals"
-        message="Moti tidak menemukan goal yang bisa diparsing ke SMART. Sebutkan target spesifik dengan deadline dalam ceritamu."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="smart-goals" />;
   }
 
   const avgProgress = goals.length > 0
@@ -128,7 +126,7 @@ export function SMARTGoalsView() {
       <div className="space-y-4">
         {goals.map((goal, i) => (
           <SMARTGoalCard
-            key={i}
+            key={goal.id ?? i}
             goal={goal}
             goalIndex={i}
             totalGoals={goals.length}

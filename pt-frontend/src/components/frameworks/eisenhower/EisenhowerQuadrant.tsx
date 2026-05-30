@@ -33,7 +33,7 @@ export const QUADRANT_CONFIG: Record<QuadrantId, QuadrantConfig> = {
   doNow: {
     id:          'doNow',
     title:       'Kerjakan Sekarang',
-    subtitle:    'Urgent + Penting',
+    subtitle:    'Penting + Mendesak',
     icon:        '🔥',
     bgColor:     '#FEE8EA',
     accentColor: '#F04E59',
@@ -44,7 +44,7 @@ export const QUADRANT_CONFIG: Record<QuadrantId, QuadrantConfig> = {
   schedule: {
     id:          'schedule',
     title:       'Jadwalkan',
-    subtitle:    'Tidak Urgent + Penting',
+    subtitle:    'Penting + Tidak Mendesak',
     icon:        '📅',
     bgColor:     '#E8F4FD',
     accentColor: '#2196E8',
@@ -55,7 +55,7 @@ export const QUADRANT_CONFIG: Record<QuadrantId, QuadrantConfig> = {
   delegate: {
     id:          'delegate',
     title:       'Delegasikan',
-    subtitle:    'Urgent + Tidak Penting',
+    subtitle:    'Tidak Penting + Mendesak',
     icon:        '🤝',
     bgColor:     '#FDF5E0',
     accentColor: '#E9B12A',
@@ -66,7 +66,7 @@ export const QUADRANT_CONFIG: Record<QuadrantId, QuadrantConfig> = {
   eliminate: {
     id:          'eliminate',
     title:       'Eliminasi',
-    subtitle:    'Tidak Urgent + Tidak Penting',
+    subtitle:    'Tidak Penting + Tidak Mendesak',
     icon:        '🗑️',
     bgColor:     '#F0FADF',
     accentColor: '#9AD84B',

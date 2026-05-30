@@ -3,6 +3,8 @@
 import { useState }               from 'react';
 import { motion, AnimatePresence }from 'framer-motion';
 import { cn }                     from '@/lib/utils';
+import { usePTStore }             from '@/store/usePTStore';
+import type { Task }              from '@/types/pt.types';
 
 /* ============================================
    PARAItem — Single item in a PARA section.
@@ -21,10 +23,13 @@ import { cn }                     from '@/lib/utils';
 export type PARAItemType = 'project' | 'area' | 'resource' | 'archive';
 
 interface PARAItemProps {
+  id?:          string;
   name:        string;
   description: string;
   type:        PARAItemType;
-  tasks?:      Array<{ title: string; isCompleted?: boolean }>;
+  tasks?:      Task[];
+  isCompleted?: boolean;
+  completed?:  boolean;
   index:       number;
   accentColor: string;
 }
@@ -41,12 +46,14 @@ const TYPE_CONFIG: Record<PARAItemType, {
 };
 
 export function PARAItem({
-  name, description, type, tasks = [], index, accentColor,
+  id, name, description, type, tasks = [], isCompleted, completed, index, accentColor,
 }: PARAItemProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const toggleTask          = usePTStore((s) => s.toggleTask);
   const config              = TYPE_CONFIG[type];
   const hasContent          = description || tasks.length > 0;
-  const completedTasks      = tasks.filter((t) => t.isCompleted).length;
+  const itemCompleted       = Boolean(isCompleted ?? completed);
+  const completedTasks      = tasks.filter((t) => t.isCompleted ?? t.completed).length;
 
   return (
     <motion.div
@@ -71,6 +78,24 @@ export function PARAItem({
         aria-expanded={hasContent ? isOpen : undefined}
         disabled={!hasContent}
       >
+        {id && (
+          <span
+            role="checkbox"
+            aria-checked={itemCompleted}
+            aria-label={itemCompleted ? `Mark "${name}" as incomplete` : `Mark "${name}" as complete`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleTask(id);
+            }}
+            className={cn(
+              'shrink-0 w-5 h-5 rounded border-2 border-pt-black flex items-center justify-center text-[11px] font-bold transition-colors',
+              itemCompleted ? 'bg-pt-green border-pt-green text-white' : 'bg-white hover:bg-pt-yellowP',
+            )}
+          >
+            {itemCompleted ? '✓' : ''}
+          </span>
+        )}
+
         {/* Folder icon */}
         <motion.span
           animate={isOpen ? { rotate: 10, scale: 1.1 } : { rotate: 0, scale: 1 }}
@@ -85,7 +110,7 @@ export function PARAItem({
         <span
           className={cn(
             'flex-1 text-left text-sm font-semibold leading-snug',
-            config.textMuted && 'line-through opacity-60',
+            (config.textMuted || itemCompleted) && 'line-through opacity-60',
           )}
           style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
         >
@@ -144,33 +169,40 @@ export function PARAItem({
               {/* Task list (projects only) */}
               {tasks.length > 0 && (
                 <div className="space-y-1 mt-2">
-                  {tasks.map((task, ti) => (
+                  {tasks.map((task, ti) => {
+                    const taskCompleted = Boolean(task.isCompleted ?? task.completed);
+                    return (
                     <div
-                      key={ti}
+                      key={task.id ?? ti}
                       className="flex items-center gap-2"
                     >
-                      <span
+                      <button
+                        type="button"
+                        onClick={() => toggleTask(task.id)}
                         className={cn(
                           'w-4 h-4 rounded border border-pt-black/30 flex items-center justify-center text-[10px]',
-                          task.isCompleted
+                          taskCompleted
                             ? 'bg-pt-green border-pt-green'
                             : 'bg-white',
                         )}
-                        aria-hidden="true"
+                        role="checkbox"
+                        aria-checked={taskCompleted}
+                        aria-label={taskCompleted ? `Mark "${task.title}" as incomplete` : `Mark "${task.title}" as complete`}
                       >
-                        {task.isCompleted ? '✓' : ''}
-                      </span>
+                        {taskCompleted ? '✓' : ''}
+                      </button>
                       <span
                         className={cn(
                           'text-xs',
-                          task.isCompleted && 'line-through opacity-50',
+                          taskCompleted && 'line-through opacity-50',
                         )}
                         style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
                       >
                         {task.title}
                       </span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

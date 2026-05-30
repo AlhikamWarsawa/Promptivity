@@ -2,6 +2,7 @@
 
 import { motion }        from 'framer-motion';
 import { PriorityBadge } from '@/components/pt/PTBadge';
+import { usePTStore }    from '@/store/usePTStore';
 import type { Priority } from '@/types/pt.types';
 
 /* ============================================
@@ -11,19 +12,22 @@ import type { Priority } from '@/types/pt.types';
    - Commitment name
    - Urgency badge
    - Category pill
-   - Recommendation (continue/drop/delegate)
+   - Recommendation (continue/drop/delegate/schedule)
      with strong visual differentiation
    - Reason tooltip/expand
    ============================================ */
 
-type Recommendation = 'continue' | 'drop' | 'delegate';
+type Recommendation = 'continue' | 'drop' | 'delegate' | 'schedule';
 
 interface CommitmentCardProps {
+  id?:             string;
   name:           string;
   urgency:        Priority;
   category:       string;
   recommendation: Recommendation;
   reason:         string;
+  isCompleted?:   boolean;
+  completed?:     boolean;
   index:          number;
 }
 
@@ -51,6 +55,14 @@ const REC_CONFIG: Record<Recommendation, {
     border:  'var(--pt-mustard)',
     advice:  'Cari orang lain yang bisa handle ini. Energimu lebih berharga di tempat lain.',
   },
+  schedule: {
+    label:   'Jadwalkan',
+    icon:    '📅',
+    color:   'var(--pt-blue)',
+    bgColor: '#E8F4FD',
+    border:  'var(--pt-blue)',
+    advice:  'Taruh komitmen ini di kalender agar tidak terus dibawa di kepala.',
+  },
   drop: {
     label:   'Drop',
     icon:    '🗑️',
@@ -71,9 +83,11 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 export function CommitmentCard({
-  name, urgency, category, recommendation, reason, index,
+  id, name, urgency, category, recommendation, reason, isCompleted, completed, index,
 }: CommitmentCardProps) {
+  const toggleTask = usePTStore((s) => s.toggleTask);
   const config = REC_CONFIG[recommendation];
+  const done = Boolean(isCompleted ?? completed);
 
   return (
     <motion.div
@@ -90,6 +104,18 @@ export function CommitmentCard({
       <div className="p-4">
         {/* Top row: name + recommendation badge */}
         <div className="flex items-start justify-between gap-3">
+          {id && (
+            <button
+              type="button"
+              onClick={() => toggleTask(id)}
+              className={`shrink-0 mt-1 w-5 h-5 rounded border-2 border-pt-black flex items-center justify-center text-[11px] font-bold ${done ? 'bg-pt-green border-pt-green text-white' : 'bg-white hover:bg-pt-yellowP'}`}
+              role="checkbox"
+              aria-checked={done}
+              aria-label={done ? `Mark "${name}" as incomplete` : `Mark "${name}" as complete`}
+            >
+              {done ? '✓' : ''}
+            </button>
+          )}
           <div className="flex-1 min-w-0">
             {/* Category + urgency */}
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -112,7 +138,7 @@ export function CommitmentCard({
 
             {/* Commitment name */}
             <p
-              className="font-semibold leading-snug"
+              className={`font-semibold leading-snug ${done ? 'line-through opacity-50' : ''}`}
               style={{ fontFamily: 'var(--font-body)', color: 'var(--pt-black)' }}
             >
               {name}

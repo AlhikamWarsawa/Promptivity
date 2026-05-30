@@ -14,11 +14,10 @@ import { PTButton } from '@/components/pt/PTButton';
 import { getFramework } from '@/lib/frameworkConfig';
 import PTStorage from '@/lib/storage';
 import { MotiMascot, PTLogo } from '@/components/pt/icons';
-import { DemoBadge } from '@/components/pt/DemoBadge';
 import { AddTaskModal } from '@/components/pt/AddTaskModal';
 import { EditTaskModal } from '@/components/pt/EditTaskModal';
 import { EmptyState } from '@/components/pt/EmptyState';
-import type { Task, FrameworkId } from '@/types/pt.types';
+import type { Task } from '@/types/pt.types';
 
 type SortOrder = 'priority' | 'time' | 'category';
 
@@ -36,6 +35,8 @@ export default function DashboardPage() {
   const toggleTask = usePTStore((s) => s.toggleTask);
   const isLoading = usePTStore((s) => s.isLoading);
   const addMoreTasks = usePTStore((s) => s.addMoreTasks);
+  const deleteTask = usePTStore((s) => s.deleteTask);
+  const generateSubtasks = usePTStore((s) => s.generateSubtasks);
 
   const [sortBy, setSortBy] = useState<SortOrder>('priority');
   const [filterDone, setFilterDone] = useState(false);
@@ -52,30 +53,12 @@ export default function DashboardPage() {
     loadFromStorage();
   }, [loadFromStorage]);
 
-  const isAuthenticated = usePTStore((s) => s.isAuthenticated);
-  const isAuthHydrated = usePTStore((s) => s.isAuthHydrated);
-  const hasCompletedOnboarding = usePTStore((s) => s.hasCompletedOnboarding);
-  const fetchLatestSession = usePTStore((s) => s.fetchLatestSession);
-  const deleteTask = usePTStore((s) => s.deleteTask);
-  const generateSubtasks = usePTStore((s) => s.generateSubtasks);
-
-  // Fetch session if authenticated but missing
+  // Redirect if no session in store or localStorage
   useEffect(() => {
-    if (mounted && isAuthHydrated && isAuthenticated && !session) {
-      fetchLatestSession();
+    if (mounted && !session && !PTStorage.getSession()) {
+      router.replace('/');
     }
-  }, [mounted, isAuthHydrated, isAuthenticated, session, fetchLatestSession]);
-
-  // Redirect kalau tidak ada session & belum onboarded
-  useEffect(() => {
-    if (mounted && isAuthHydrated && !session) {
-      if (!isAuthenticated && !PTStorage.getSession()) {
-        router.replace('/');
-      } else if (isAuthenticated && !hasCompletedOnboarding) {
-        router.replace('/onboarding/input-method');
-      }
-    }
-  }, [mounted, isAuthHydrated, session, isAuthenticated, hasCompletedOnboarding, router]);
+  }, [mounted, session, router]);
 
   // Sort tasks
   const sortedTasks = useMemo(() => {
@@ -104,14 +87,11 @@ export default function DashboardPage() {
   }, [session]);
 
   const topFramework = sortedFrameworks[0];
-  const user = usePTStore((s) => s.user);
 
-  if (!mounted || !isAuthHydrated) return <DashboardSkeleton />;
-  if (isAuthenticated && !session && hasCompletedOnboarding) return <AuthenticatedEmptyDashboard />;
-  if (!session) return <DashboardSkeleton />;
+  if (!mounted || !session) return <DashboardSkeleton />;
 
   const persona = PTStorage.getPersona();
-  const firstName = user?.name?.split(' ')[0] || persona?.name?.split(' ')[0] || 'Friend';
+  const firstName = persona?.name?.split(' ')[0] || 'Friend';
   const userRole = persona?.role && persona.role !== 'lainnya' ? persona.role : null;
 
   const completedCount = session.masterTaskList.filter((t) => t.isCompleted).length;
@@ -121,7 +101,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--pt-white)' }}>
       <DashboardNav userName={persona?.name} />
-      <DemoBadge />
       <HeroSection firstName={firstName} role={userRole} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
@@ -152,9 +131,9 @@ export default function DashboardPage() {
                   label={`Semua Task (${completedCount}/${totalCount} selesai)`}
                 />
 
-                <PTButton 
-                  variant="primary" 
-                  size="sm" 
+                <PTButton
+                  variant="primary"
+                  size="sm"
                   onClick={() => setIsAddTaskOpen(true)}
                   className="order-first sm:order-none w-full sm:w-auto"
                 >
@@ -216,7 +195,7 @@ export default function DashboardPage() {
               )}
 
               {isAllCompleted && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="mt-8 p-6 rounded-sketch border-2 border-dashed border-pt-black/30 bg-pt-cream/20 flex flex-col items-center text-center gap-4"
@@ -246,9 +225,9 @@ export default function DashboardPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 + i * 0.03 }}
                   >
-                    <FrameworkCard 
-                      framework={fw} 
-                      variant="grid" 
+                    <FrameworkCard
+                      framework={fw}
+                      variant="grid"
                       rank={i + 1}
                     />
                   </motion.div>
@@ -261,7 +240,6 @@ export default function DashboardPage() {
             <div className="hidden lg:block lg:sticky lg:top-24 space-y-6">
               <TodayPlanPanel actions={session.todayPlan} />
               <QuickStats totalTasks={totalCount} completedTasks={completedCount} topFramework={session.topRecommendation} processedAt={session.processedAt} />
-              <JournalCTA />
             </div>
           </div>
         </div>
@@ -348,39 +326,6 @@ function StatRow({ label, value, color, small }: any) {
     <div className="flex items-center justify-between">
       <span className="text-sm text-pt-brown" style={{ fontFamily: 'var(--font-body)' }}>{label}</span>
       <span className={`${small ? 'text-xs' : 'text-sm font-bold'}`} style={{ fontFamily: 'var(--font-body)', color: color ?? 'var(--pt-black)' }}>{value}</span>
-    </div>
-  );
-}
-
-function JournalCTA() {
-  return (
-    <Link href="/journal" className="block group">
-      <motion.div
-        whileHover={{ y: -6, rotate: -1 }}
-        className="p-5 rounded-sketch border-[3px] border-pt-black shadow-sketch bg-[#E0F2FE] transition-all relative overflow-hidden"
-      >
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-full bg-white border-2 border-pt-black flex items-center justify-center">
-            <span className="text-xl">📖</span>
-          </div>
-          <h3 className="font-display text-xl text-pt-black group-hover:text-pt-blue mt-1">Productivity Journal</h3>
-        </div>
-        <p className="text-sm text-pt-brown mt-3" style={{ fontFamily: 'var(--font-body)' }}>Review your past sessions & history.</p>
-      </motion.div>
-    </Link>
-  );
-}
-
-function AuthenticatedEmptyDashboard() {
-  return (
-    <div className="min-h-screen bg-pt-white">
-      <DashboardNav />
-      <main className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <div className="text-8xl mb-8">🏜️</div>
-        <h1 className="text-display mb-4" style={{ fontFamily: 'var(--font-display)' }}>No missions yet</h1>
-        <p className="text-lg text-pt-brown mb-10 max-w-md mx-auto" style={{ fontFamily: 'var(--font-body)' }}>Kamu belum punya mission aktif.</p>
-        <PTButton variant="primary" size="lg" onClick={() => window.location.href = '/onboarding/input-method'}>🚀 Build Your First Mission</PTButton>
-      </main>
     </div>
   );
 }

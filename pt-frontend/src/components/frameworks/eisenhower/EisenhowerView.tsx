@@ -4,6 +4,8 @@ import { useMemo }                            from 'react';
 import { motion }                             from 'framer-motion';
 import { EisenhowerQuadrant, QUADRANT_CONFIG } from './EisenhowerQuadrant';
 import { FrameworkEmptyState }                from '@/components/frameworks/FrameworkPageLayout';
+import { FrameworkAddTaskButton }             from '@/components/frameworks/shared/FrameworkAddTaskButton';
+import { FrameworkGenerateMoreTasks }         from '@/components/frameworks/shared/FrameworkGenerateMoreTasks';
 import { useFramework }                       from '@/store/usePTStore';
 import type { Task }                          from '@/types/pt.types';
 
@@ -29,6 +31,16 @@ interface EisenhowerRawData {
 // Priority order for mobile view (most to least urgent/important)
 const QUADRANT_ORDER = ['doNow', 'schedule', 'delegate', 'eliminate'] as const;
 
+const COLUMN_LABELS = [
+  { title: 'Mendesak', subtitle: 'Perlu ditangani segera' },
+  { title: 'Tidak Mendesak', subtitle: 'Perlu dijadwalkan' },
+];
+
+const ROW_LABELS = [
+  { title: 'Penting', subtitle: 'Prioritas utama', strong: true },
+  { title: 'Tidak Penting', subtitle: 'Sekunder', strong: false },
+];
+
 export function EisenhowerView() {
   const fwData = useFramework('eisenhower');
 
@@ -43,12 +55,7 @@ export function EisenhowerView() {
   );
 
   if (!fwData || totalTasks === 0) {
-    return (
-      <FrameworkEmptyState
-        frameworkId="eisenhower"
-        message="Moti tidak bisa memetakan task ke matriks. Coba sebutkan task mana yang mendesak vs penting dalam ceritamu."
-      />
-    );
+    return <FrameworkEmptyState frameworkId="eisenhower" />;
   }
 
   return (
@@ -58,38 +65,49 @@ export function EisenhowerView() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="p-3 rounded-sketch border-2 border-pt-black text-sm"
+        className="p-3 rounded-sketch border-2 border-pt-black text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
         style={{
           backgroundColor: '#F5D60D25',
           fontFamily:      'var(--font-body)',
           color:           '#4B4B4B',
         }}
       >
-        ⚡ Matriks Eisenhower memisahkan yang <strong>mendesak</strong> dari yang{' '}
-        <strong>penting</strong>. Fokuslah pada kuadran kiri atas dulu.
+        <span>
+          ⚡ Matriks Eisenhower memisahkan yang <strong>mendesak</strong> dari yang{' '}
+          <strong>penting</strong>. Fokuslah pada kuadran kiri atas dulu.
+        </span>
+        <FrameworkAddTaskButton frameworkId="eisenhower" className="shrink-0 min-h-[44px]" />
       </motion.div>
 
       {/* Matrix Grid (2x2) */}
       <div className="flex flex-col gap-4">
         {/* Urgent/Not Urgent Labels */}
-        <div className="flex pl-8 sm:pl-12 gap-2 sm:gap-3">
-          {['⚡ Urgent', '🌊 Later'].map((label) => (
-            <div key={label} className="flex-1 text-center">
-              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-pt-black/50">
-                {label}
+        <div className="flex pl-16 sm:pl-[92px] gap-2 sm:gap-3">
+          {COLUMN_LABELS.map((label) => (
+            <div key={label.title} className="flex-1 text-center">
+              <span className="block text-[10px] sm:text-xs font-bold uppercase tracking-wide text-pt-black/70">
+                {label.title}
+              </span>
+              <span className="hidden sm:block text-[9px] font-semibold text-pt-black/40">
+                {label.subtitle}
               </span>
             </div>
           ))}
         </div>
 
         <div className="flex gap-2 sm:gap-3">
-          {/* Important/Not Important Vertical Labels */}
-          <div className="flex flex-col gap-2 sm:gap-3 w-6 sm:w-10 shrink-0">
-            {['🎯 Penting', '📎 Sekunder'].map((label) => (
-              <div key={label} className="flex-1 flex items-center justify-center">
-                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-pt-black/50 vertical-text rotate-180">
-                  {label}
-                </span>
+          {/* Important/Not Important Row Labels */}
+          <div className="flex flex-col gap-2 sm:gap-3 w-14 sm:w-20 shrink-0">
+            {ROW_LABELS.map((label) => (
+              <div key={label.title} className="flex-1 flex items-center justify-center">
+                <div className="text-center leading-tight">
+                  <span className={`block uppercase tracking-wide ${label.strong ? 'text-[11px] sm:text-sm font-black text-pt-black/75' : 'text-[10px] sm:text-xs font-bold text-pt-black/55'}`}>
+                    {label.title}
+                  </span>
+                  <span className="block text-[8px] sm:text-[9px] font-semibold text-pt-black/35 normal-case tracking-normal">
+                    {label.subtitle}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -105,6 +123,7 @@ export function EisenhowerView() {
 
       {/* Summary row — always visible */}
       <MatrixSummary rawData={rawData} />
+      <FrameworkGenerateMoreTasks frameworkId="eisenhower" />
     </div>
   );
 }
@@ -116,13 +135,13 @@ function MatrixWithAxisLabels({ rawData }: { rawData: EisenhowerRawData }) {
     <div>
       {/* Column axis labels (top) — Urgent | Tidak Urgent */}
       <div className="flex pl-12 gap-3 mb-2">
-        {['⚡ Urgent', '🌊 Tidak Urgent'].map((label) => (
-          <div key={label} className="flex-1 text-center">
+        {COLUMN_LABELS.map((label) => (
+          <div key={label.title} className="flex-1 text-center">
             <span
               className="text-label font-bold uppercase tracking-wide"
               style={{ fontFamily: 'var(--font-body)', color: '#6B6B6B' }}
             >
-              {label}
+              {label.title}
             </span>
           </div>
         ))}
@@ -131,19 +150,19 @@ function MatrixWithAxisLabels({ rawData }: { rawData: EisenhowerRawData }) {
       <div className="flex gap-3">
         {/* Row axis labels (left) — Penting | Tidak Penting */}
         <div className="flex flex-col gap-3 w-10 shrink-0">
-          {['🎯 Penting', '📎 Tidak Penting'].map((label) => (
-            <div key={label} className="flex-1 flex items-center justify-center">
+          {ROW_LABELS.map((label) => (
+            <div key={label.title} className="flex-1 flex items-center justify-center">
               <span
-                className="text-label font-bold uppercase tracking-wide"
+                className={label.strong ? 'text-sm font-black uppercase tracking-wide' : 'text-label font-bold uppercase tracking-wide'}
                 style={{
                   fontFamily:      'var(--font-body)',
-                  color:           '#6B6B6B',
+                  color:           label.strong ? 'var(--pt-black)' : '#6B6B6B',
                   writingMode:     'vertical-rl',
                   textOrientation: 'mixed',
                   transform:       'rotate(180deg)',
                 }}
               >
-                {label}
+                {label.title}
               </span>
             </div>
           ))}

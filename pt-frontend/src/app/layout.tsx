@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 import { StoreInitializer } from '@/components/pt/StoreInitializer';
-import { AuthGuard } from '@/components/pt/AuthGuard';
 import { StorageFullModal } from '@/components/pt/StorageFullModal';
 import './globals.css';
 
@@ -38,11 +37,11 @@ const gaegu = localFont({
 export const metadata: Metadata = {
   title: 'Promptivity — Tell Your Story. We Build Your Mission.',
   description:
-    'Promptivity mengubah cerita hidupmu menjadi mission plan terstruktur menggunakan 15 productivity framework berbasis AI.',
+    'Promptivity transforms your messy thoughts into structured action using 15 AI-powered productivity frameworks.',
   keywords: ['productivity', 'AI', 'mission planning', 'GTD', 'Kanban', 'Pomodoro', 'Promptivity'],
   openGraph: {
     title: 'Promptivity — Tell Your Story. We Build Your Mission.',
-    description: 'AI-powered productivity mission builder.',
+    description: 'An AI productivity OS that transforms messy thoughts into structured action.',
     type: 'website',
   },
 };
@@ -64,9 +63,7 @@ export default function RootLayout({
       >
         <StoreInitializer />
         <StorageFullModal />
-        <AuthGuard>
-          {children}
-        </AuthGuard>
+        {children}
       </body>
     </html>
   );

@@ -20,16 +20,16 @@ app = FastAPI(
 
 # CORS — allow frontend origins
 ALLOWED_ORIGINS = [
+    "https://promptivity-web-51894490688.asia-southeast2.run.app",
     "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3000",
+    "http://localhost:8080",
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins     = ALLOWED_ORIGINS,
     allow_credentials = True,
-    allow_methods     = ["GET", "POST", "OPTIONS"],
+    allow_methods     = ["*"],
     allow_headers     = ["*"],
 )
 

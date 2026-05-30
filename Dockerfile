@@ -27,7 +27,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     nginx \
-    supervisor \
     curl \
   && rm -rf /var/lib/apt/lists/*
 
@@ -43,11 +42,13 @@ COPY --from=frontend-builder /app/pt-frontend/.next/standalone /app/pt-frontend
 COPY --from=frontend-builder /app/pt-frontend/.next/static /app/pt-frontend/.next/static
 
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
-COPY deploy/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY deploy/start.sh /app/deploy/start.sh
+RUN test -f /app/pt-frontend/server.js \
+  && python3 -c "import fastapi, uvicorn"
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
   CMD curl -f http://localhost:8080/health || exit 1
 
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/app/deploy/start.sh"]

@@ -6,46 +6,21 @@
 version: "3.9"
 
 services:
-  frontend:
+  promptivity:
     build:
-      context: ./pt-frontend
+      context: .
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: http://localhost:8000
-    container_name: pt-frontend
+    container_name: promptivity
     ports:
-      - "3000:8080"
-    environment:
-      - NODE_ENV=production
-      - PORT=8080
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    depends_on:
-      - backend
-    restart: unless-stopped
-    networks:
-      - pt-network
-
-  backend:
-    build:
-      context: ./pt-backend
-      dockerfile: Dockerfile
-    container_name: pt-backend
-    ports:
-      - "8000:8080"
+      - "8080:8080"
     environment:
       - APP_ENV=production
       - PORT=8080
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - SECRET_KEY=${SECRET_KEY}
     restart: unless-stopped
-    networks:
-      - pt-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-networks:
-  pt-network:
-    driver: bridge

@@ -2,7 +2,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from schemas.responses import HealthResponse
 from routers import ai
 
@@ -16,21 +15,6 @@ app = FastAPI(
     version     = "0.2.0",
     docs_url    = "/docs",
     redoc_url   = "/redoc",
-)
-
-# CORS — allow frontend origins
-ALLOWED_ORIGINS = [
-    "https://promptivity-web-51894490688.asia-southeast2.run.app",
-    "http://localhost:3000",
-    "http://localhost:8080",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins     = ALLOWED_ORIGINS,
-    allow_credentials = True,
-    allow_methods     = ["*"],
-    allow_headers     = ["*"],
 )
 
 # Routers

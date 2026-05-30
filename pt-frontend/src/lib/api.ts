@@ -1,52 +1,9 @@
-const LOCAL_API_BASE_URL = 'http://localhost:8000';
-const PRODUCTION_API_BASE_URL = 'https://promptivity-51894490688.asia-southeast2.run.app';
-
-function normalizeApiBaseUrl(url: string): string {
-  return url.trim().replace(/\/+$/, '');
-}
-
-function getFallbackApiBaseUrl(): string {
-  return process.env.NODE_ENV === 'production'
-    ? PRODUCTION_API_BASE_URL
-    : LOCAL_API_BASE_URL;
-}
-
-function getBrowserOrigin(): string | null {
-  return typeof globalThis.location?.origin === 'string'
-    ? normalizeApiBaseUrl(globalThis.location.origin)
-    : null;
-}
-
-function resolveApiBaseUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  const fallbackUrl = getFallbackApiBaseUrl();
-  const normalizedConfiguredUrl = configuredUrl ? normalizeApiBaseUrl(configuredUrl) : '';
-  const browserOrigin = getBrowserOrigin();
-
-  if (normalizedConfiguredUrl && normalizedConfiguredUrl !== browserOrigin) {
-    return normalizedConfiguredUrl;
-  }
-
-  if (normalizedConfiguredUrl && normalizedConfiguredUrl === browserOrigin) {
-    console.warn(
-      '[Promptivity API] NEXT_PUBLIC_API_URL points to the frontend origin; using fallback API base URL:',
-      fallbackUrl,
-    );
-  }
-
-  return normalizeApiBaseUrl(fallbackUrl);
-}
-
-export const API_BASE_URL = resolveApiBaseUrl();
-
-console.info('[Promptivity API] Resolved API base URL:', API_BASE_URL);
-
 export function apiUrl(endpoint: string): string {
   if (!endpoint.startsWith('/')) {
     throw new Error(`API endpoint must start with "/": ${endpoint}`);
   }
 
-  return `${API_BASE_URL}${endpoint}`;
+  return endpoint;
 }
 
 export async function apiFetch(

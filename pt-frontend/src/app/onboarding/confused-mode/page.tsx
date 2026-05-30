@@ -11,7 +11,7 @@ import { OnboardingTopBar } from '@/components/pt/OnboardingTopBar';
 import { ProcessingOverlay } from '@/components/pt/ProcessingOverlay';
 import { PT_PROCESSING_MESSAGES } from '@/components/pt/ProcessingOverlay';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://promptivity-51894490688.asia-southeast2.run.app';
 
 /* ============================================
    /onboarding/confused-mode

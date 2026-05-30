@@ -1,7 +1,6 @@
 import type { PTSession, Personalization } from '@/types/pt.types';
+import { apiFetch } from '@/lib/api';
 import { parseSession, parseFrameworkOutput } from '@/lib/parsers';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 export interface ProcessStoryInput {
   rawText:          string;
@@ -27,9 +26,8 @@ export async function processStoryAPI(
   const timeoutId  = setTimeout(() => controller.abort(), 90_000);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/process-story`, {
+    const response = await apiFetch('/api/process-story', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
         story:           input.rawText,
         personalization: input.personalization ?? null,
@@ -71,9 +69,8 @@ export async function generateFrameworkAPI(
   frameworkId: string,
 ): Promise<FrameworkAPIResult> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/generate-framework`, {
+    const response = await apiFetch('/api/generate-framework', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ sessionId, frameworkId }),
     });
 
